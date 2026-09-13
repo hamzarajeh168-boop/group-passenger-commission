@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>شهم - جروب نقل ركاب</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="shell">
+<header><div><b>شهم</b><span>جروب نقل ركاب</span></div><label>كلمة سر الإدارة <input id="key" type="password" value="shahm-2026"></label></header>
+<section class="hero"><div class="road"></div><div id="car">🚕</div><h1>غرفة تحكم شهم</h1><p>محافظ الكباتن وعمولات الطلبات من جروب واحد</p></section>
+<section class="grid">
+<article><h2>ربط WhatsApp والجروب</h2><label>رقم WhatsApp<input id="wa"></label><label>معرّف الجروب<input id="group"></label><label>الإيموجي المعتمد<input id="emoji" value="👍"></label><button id="saveSettings">حفظ الربط والقواعد</button></article>
+<article><h2>إضافة قاعدة عمولة</h2><div class="row"><input id="ruleMatch" placeholder="النص أو الرقم"><input id="ruleAmount" type="number" step=".01" placeholder="العمولة"></div><button id="addRule">إضافة للحقل</button><div id="rules"></div></article>
+<article><h2>إنشاء حساب كابتن</h2><label>اسم الكابتن<input id="captainName"></label><label>رقم الهاتف<input id="captainPhone"></label><button id="createCaptain">إنشاء حساب</button><p id="captainMsg"></p></article>
+<article><h2>شحن رصيد</h2><div class="row"><input id="topPhone" placeholder="رقم الهاتف"><input id="topAmount" type="number" step=".01" placeholder="القيمة"></div><button id="topup">شحن الرصيد</button><p id="topMsg"></p></article>
+<article class="wide"><h2>بحث عن كابتن بالكود أو الهاتف</h2><input id="search" placeholder="SH-123456 أو رقم الهاتف"><div id="captains"></div></article>
+<article class="wide"><h2>سجل المحفظة والخصومات</h2><button id="refreshLedger">تحديث السجل</button><div id="ledger"></div></article>
+</section></main><script src="/app.js"></script></body></html>
