@@ -2,5 +2,11 @@
   "name": "shahm-passenger-group",
   "private": true,
   "scripts": { "start": "node server.js", "dev": "node server.js" },
-  "dependencies": { "express": "^5.1.0" }
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.18",
+    "express": "^5.1.0",
+    "pino": "^9.6.0",
+    "qrcode-terminal": "^0.12.0"
+  }
 }

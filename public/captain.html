@@ -1,0 +1,10 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>شهم - صفحة جرد الكابتن</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="shell">
+<header><div><b>شهم</b><span>صفحة جرد الكابتن</span></div><a class="button-link" href="/control-room">غرفة الإدارة</a></header>
+<section class="hero"><div class="road"></div><div id="car">🚕</div><h1>صفحة جرد الكابتن</h1><p>تابع رصيدك وعمولاتك وطلباتك في أي وقت</p></section>
+<section class="grid">
+<article id="loginCard"><h2>دخول الكابتن</h2><p class="hint">استخدم رقم الهاتف أو الكود الموجود على بطاقة حسابك.</p><label>رقم الهاتف أو كود الكابتن<input id="loginValue" autocomplete="username" placeholder="07xxxxxxxx أو SH-123456"></label><button id="login">عرض الجرد</button><p id="loginMsg"></p></article>
+<article class="wide" id="dashboard" hidden><div class="card-head"><span><h2 id="captainName"></h2><small id="captainIdentity"></small></span><button id="logout">تسجيل خروج</button></div><div class="captain-card"><div class="card-head"><span><b>الرصيد الحالي</b><small id="captainStatus"></small></span><strong id="balance"></strong></div><div class="stats"><span>💸 إجمالي الاستهلاك <b id="charges"></b></span><span>➕ إجمالي الشحن <b id="topups"></b></span><span>🚶 ركاب <b id="passengers"></b></span><span>📦 أوردرات <b id="orders"></b></span><span>🏁 أرضية جروب <b id="groupFloor"></b></span></div></div><h2>سجل الجرد والذمم</h2><div id="ledger"></div></article>
+</section></main><script src="/captain.js"></script></body></html>

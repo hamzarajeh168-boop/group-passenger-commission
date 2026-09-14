@@ -11,6 +11,8 @@ npm start
 
 افتح `http://localhost:4000/control-room`. كلمة السر المحلية الافتراضية `shahm-2026`، ويستحسن تغييرها عبر متغير البيئة `ADMIN_KEY`.
 
+صفحة جرد الكابتن متاحة عبر `http://localhost:4000/captain`. يدخل الكابتن برقم هاتفه أو الكود العشوائي الظاهر عند إنشاء الحساب، وتعرض الصفحة الرصيد وسجل الشحن والخصومات والإحصائيات بصلاحية قراءة فقط.
+
 ## النشر
 
 للنشر على Render استخدم:
@@ -18,7 +20,15 @@ npm start
 - Build Command: `npm install`
 - Start Command: `npm start`
 
-أضف الأسرار من Environment Variables فقط:
+للتجربة المحلية، يستخدم شهم Baileys افتراضيًا بدل Green API. شغّل `npm install` ثم `npm start`، وامسح رمز QR الظاهر في الطرفية من WhatsApp المرتبط بالكابتن الإداري. ستُحفظ جلسة الربط في `auth_info`، ولا ترفع هذا المجلد إلى GitHub أو Render.
+
+يمكن تعطيل Baileys والعودة إلى Green API عبر:
+
+`BAILEYS_ENABLED=false`
+
+عند استخدام Baileys يجب أن يكون رقم WhatsApp المرتبط أدمن في الجروب حتى يستطيع إزالة الكابتن عند عدم كفاية الرصيد.
+
+أضف الأسرار من Environment Variables فقط عند استخدام Green API:
 
 - `ADMIN_KEY`
 - `GREEN_API_INSTANCE_ID`
