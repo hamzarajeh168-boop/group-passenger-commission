@@ -3,3 +3,6 @@ node_modules/
 data/state.json
 auth_info/
 npm-debug.log*
+*.log
+*.bak
+

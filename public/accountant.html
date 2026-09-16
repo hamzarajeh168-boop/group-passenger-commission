@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>شهم - صفحة المحاسب</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+
+<body>
+    <main class="shell">
+        <header>
+            <div><b>شهم</b><span>صفحة المحاسب</span></div><a href="/">غرفة الإدارة</a>
+        </header>
+        <section class="hero">
+            <div class="road"></div>
+            <div id="car">🚕</div>
+            <h1>صفحة المحاسب</h1>
+            <p>محفظتك وإدارة أرقام المستهلكين والمنتجين</p>
+        </section>
+
+        <section class="grid" id="loginCard">
+            <article>
+                <h2>دخول المحاسب</h2><label>رقم الهاتف<input id="phone"></label><label>كلمة السر<input id="password"
+                        type="password"></label><button id="login">دخول</button>
+                <p id="loginMsg"></p>
+            </article>
+        </section>
+
+        <section class="grid" id="panel" hidden>
+            <article class="wide">
+                <div class="card-head"><span>
+                        <h2 id="accName"></h2><small id="accIdentity"></small>
+                    </span><button id="logout">تسجيل خروج</button></div>
+                <div class="captain-card">
+                    <div class="card-head"><span><b>محفظتك</b></span><strong id="accBalance"></strong></div>
+                </div>
+            </article>
+
+            <article>
+                <h2>إرسال رصيد</h2>
+                <p class="hint">الإرسال من محفظتك فقط — اكتب القيمة ورقم المستلم</p>
+                <div class="row"><input id="sendPhone" placeholder="رقم المستلم"><input id="sendAmount" type="number"
+                        step=".01" placeholder="القيمة"></div><button id="sendBalance">إرسال</button>
+                <p id="sendMsg"></p>
+            </article>
+
+            <article>
+                <h2>إزالة من جروب الواتساب</h2>
+                <p class="hint">ضع رقم الهاتف وابحث ثم اضغط زر الإزالة (بياناته تبقى محفوظة)</p>
+                <div class="row"><input id="rmPhone" placeholder="رقم الهاتف"><button id="searchBtn">بحث</button></div>
+                <div id="searchResult"></div>
+            </article>
+
+            <article>
+                <h2>إضافة خانة بقيمة</h2>
+                <p class="hint">المستهلك دائمًا <b class="bad">سالب</b> (يُسحب من محفظته ويعطى للمنتج المرتبط)، والمنتج
+                    دائمًا <b class="ok">موجب</b></p>
+                <div class="row"><input id="entryPhone" placeholder="رقم الهاتف"><input id="entryAmount" type="number"
+                        step=".01" placeholder="القيمة"><select id="entryKind">
+                        <option value="consumption">مستهلك (سالب)</option>
+                        <option value="production">منتج (موجب)</option>
+                    </select></div><button id="addEntry">إضافة</button>
+                <p id="entryMsg"></p>
+            </article>
+
+            <article class="wide">
+                <h2>المستهلكون 🚶</h2>
+                <p class="hint">كل مستهلك يظهر تحته عدد الركاب وقيمتها والأوردرات وقيمتها</p>
+                <div id="consumers"></div>
+            </article>
+            <article class="wide">
+                <h2>المنتجون 📦</h2>
+                <div id="products"></div>
+            </article>
+        </section>
+    </main>
+    <script src="/accountant.js"></script>
+</body>
+
+</html>

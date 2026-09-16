@@ -1,1 +1,83 @@
-const $=id=>document.getElementById(id);let settings={rules:[]};const headers=()=>({'Content-Type':'application/json','x-admin-key':$('key').value.trim()});async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{...headers(),...(opt.headers||{})}});const d=await r.json();if(!r.ok)throw Error(d.error||'حدث خطأ');return d}function msg(el,text,ok=false){el.textContent=text;el.className=ok?'ok':'bad'}function renderRules(){ $('rules').innerHTML=settings.rules.map((r,i)=>{const direction=r.direction==='production'?'production':'consumption';const category=r.category||'other';return `<div class="rule rule-editor"><input aria-label="نص القاعدة ${i+1}" value="${String(r.match||'').replace(/"/g,'&quot;')}" oninput="settings.rules[${i}].match=this.value;settings.rules[${i}].label=this.value"><input aria-label="قيمة القاعدة ${i+1}" type="number" min="0" step=".01" value="${Number(r.commission)||0}" oninput="settings.rules[${i}].commission=Number(this.value)"><select aria-label="نوع القاعدة ${i+1}" onchange="settings.rules[${i}].direction=this.value"><option value="consumption" ${direction==='consumption'?'selected':''}>استهلاك سالب</option><option value="production" ${direction==='production'?'selected':''}>إنتاج موجب</option></select><select aria-label="تصنيف القاعدة ${i+1}" onchange="settings.rules[${i}].category=this.value"><option value="passengers" ${category==='passengers'?'selected':''}>راكب</option><option value="orders" ${category==='orders'?'selected':''}>أوردر</option><option value="groupFloor" ${category==='groupFloor'?'selected':''}>أرضية جروب</option><option value="other" ${category==='other'?'selected':''}>أخرى</option></select><label class="rule-toggle"><input type="checkbox" ${r.enabled!==false?'checked':''} onchange="settings.rules[${i}].enabled=this.checked"> فعالة</label><button onclick="settings.rules.splice(${i},1);renderRules()">حذف</button></div>`}).join('')}async function load(){settings=await api('/api/settings');$('wa').value=settings.whatsappNumber||'';$('group').value=settings.groupId||'';$('emoji').value=settings.likeEmoji||'👍';renderRules();await captains()}async function saveSettings(){settings.whatsappNumber=$('wa').value;settings.groupId=$('group').value;settings.likeEmoji=$('emoji').value||'👍';await api('/api/settings',{method:'PUT',body:JSON.stringify(settings)});alert('تم حفظ إعدادات شهم والقواعد')}$('addRule').onclick=()=>{const match=$('ruleMatch').value.trim(),commission=Number($('ruleAmount').value);if(!match||!Number.isFinite(commission)||commission<0)return alert('أدخل النص والقيمة');settings.rules.push({match,label:match,commission,direction:$('ruleDirection').value,category:$('ruleCategory').value,enabled:true});$('ruleMatch').value='';$('ruleAmount').value='';renderRules()};$('saveSettings').onclick=()=>saveSettings().catch(e=>alert(e.message));$('createCaptain').onclick=async()=>{try{const c=await api('/api/captains',{method:'POST',body:JSON.stringify({name:$('captainName').value,phone:$('captainPhone').value})});msg($('captainMsg'),`تم إنشاء ${c.name} بالكود ${c.code}`,true);await captains()}catch(e){msg($('captainMsg'),e.message)}};$('topup').onclick=async()=>{try{const c=await api('/api/wallet/topup',{method:'POST',body:JSON.stringify({phone:$('topPhone').value,amount:Number($('topAmount').value)})});msg($('topMsg'),`الرصيد الحالي ${c.balance.toFixed(2)} د.أ`,true);await captains()}catch(e){msg($('topMsg'),e.message)}};function card(c){const s={passengers:0,orders:0,groupFloor:0,fullCars:0,totalTrips:0,totalCommission:0,...(c.stats||{})};const blocked=safeBalance(c.balance)<.75;return `<div class="captain-card ${blocked?'low-balance':''}"><div class="card-head"><span><b>${c.name}</b><small>${c.code} · ${c.phone}</small></span><strong>${safeBalance(c.balance).toFixed(2)} د.أ</strong></div><div class="card-status ${blocked?'bad':'ok'}">${blocked?'ممنوع من أخذ الطلبات - يحتاج شحن':'مؤهل للأخذ'} · ${c.status}</div><div class="stats"><span>🚶 ركاب <b>${s.passengers}</b></span><span>📦 أوردرات <b>${s.orders}</b></span><span>🏁 أرضية جروب <b>${s.groupFloor}</b></span><span>📊 الإجمالي <b>${s.totalTrips}</b></span><span>💸 استهلاك <b>${safeBalance(s.totalCommission).toFixed(2)}</b></span></div><button onclick="statusCaptain('${c.id}','${c.status==='blocked'?'active':'blocked'}')">${c.status==='blocked'?'تفعيل':'حظر'}</button></div>`}function safeBalance(value){const n=Number(value);return Number.isFinite(n)?n:0}async function captains(){const list=await api('/api/captains');const q=$('search').value.toLowerCase();$('captains').innerHTML=list.filter(c=>!q||`${c.code} ${c.phone} ${c.name}`.toLowerCase().includes(q)).map(card).join('')||'<small>لا توجد حسابات</small>'}async function statusCaptain(id,status){await api('/api/captains/'+id+'/status',{method:'POST',body:JSON.stringify({status})});captains()}$('search').oninput=captains;$('refreshLedger').onclick=async()=>{$('ledger').innerHTML=(await api('/api/ledger')).map(x=>`<div class="ledger"><span>${x.phone}<small> · ${x.rule||x.note||''} ${x.category||''}<br>${x.requestText||''}</small></span><b class="${x.type==='commission'?'bad':'ok'}">${x.amount>0?'+':''}${x.amount.toFixed(2)} د.أ</b></div>`).join('')||'<small>لا يوجد سجل</small>'};load().catch(e=>alert(e.message));
+const $ = id => document.getElementById(id);
+const headers = () => ({ 'Content-Type': 'application/json', 'x-admin-key': $('key').value.trim() });
+const esc = t => String(t ?? '').replace(/[<>&"]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c]));
+const money = v => `${Number(v || 0).toFixed(2)} د.أ`;
+function msg(el, text, ok = false) { el.textContent = text; el.className = ok ? 'ok' : 'bad'; }
+async function api(url, opt = {}) {
+  const r = await fetch(url, { ...opt, headers: { ...headers(), ...(opt.headers || {}) } });
+  const d = await r.json();
+  if (!r.ok) throw Error(d.error || 'حدث خطأ');
+  return d;
+}
+let accounts = [];
+
+async function loadAll() {
+  try {
+    accounts = await api('/api/admin/accounts');
+    renderAccounts(); renderCommissions(); renderLedger();
+    const s = await api('/api/admin/settings');
+    $('wa').value = s.whatsappNumber || ''; $('group').value = s.groupId || '';
+    $('cPass').value = s.passengerCommission ?? 0.5; $('cOrder').value = s.orderCommission ?? 1;
+  } catch (e) { msg($('loginMsg'), e.message); }
+}
+function renderCommissions() {
+  $('cConsumption').textContent = money(accounts.commissions.consumption);
+  $('cProduction').textContent = money(accounts.commissions.production);
+}
+function accountRow(a, kind) {
+  const roleLabel = kind === 'acc' ? 'محاسب' : (a.role === 'consumption' ? 'مستهلك' : 'منتج');
+  const stats = a.stats ? ` · 🚶 ${a.stats.passengers || 0} راكب · 📦 ${a.stats.orders || 0} أوردر` : '';
+  return `<div class="ledger"><span><b>${esc(a.name)}</b> <small>${roleLabel} · ${a.phone} · ${esc(a.email || '')} · الرقم السري: ${a.pin}${stats}</small></span>
+ <span class="actions"><b class="${a.balance > 0 ? 'ok' : 'bad'}">${money(a.balance)}</b>
+  ${a.removedFromGroup ? '<small class="bad">مزال من الجروب</small>' : ''}
+ <button onclick="removeFromGroup('${a.phone}')">إزالة من الجروب</button></span></div>`;
+}
+function renderAccounts() {
+  const q = $('search').value.trim().replace(/\D/g, '');
+  const accs = accounts.accountants.filter(a => !q || a.phone.includes(q));
+  const caps = accounts.captains.filter(c => !q || c.phone.includes(q));
+  $('accounts').innerHTML =
+    `<h3>المحاسبون</h3>${accs.map(a => accountRow(a, 'acc')).join('') || '<small>لا يوجد</small>'}
+     <h3>الكباتن</h3>${caps.map(c => accountRow(c, 'cap')).join('') || '<small>لا يوجد</small>'}
+     <h3>الروابط (مستهلك ← منتج)</h3>${accounts.pairs.map(p => `<div class="ledger"><small>${p.consumerPhone} ← ${p.productPhone}</small></div>`).join('') || '<small>لا يوجد ربط</small>'}`;
+}
+async function renderLedger() {
+  try {
+    const ledger = await api('/api/admin/ledger');
+    const label = { consumption: 'استهلاك', production: 'إنتاج', topup: 'شحن', withdraw: 'سحب', transfer: 'تحويل', weekly: 'خصم أسبوعي', system: 'نظام' };
+    $('ledger').innerHTML = ledger.map(e => `<div class="ledger"><span>${label[e.type] || e.type}<small>${e.phone} ${e.note || ''} ${e.createdAt}</small></span><b class="${e.amount < 0 ? 'bad' : 'ok'}">${e.amount > 0 ? '+' : ''}${money(e.amount)}</b></div>`).join('') || '<small>لا يوجد عمليات</small>';
+  } catch (e) { }
+}
+window.removeFromGroup = async phone => {
+  if (!confirm(`إزالة ${phone} من جروب الواتساب؟ (بياناته ستبقى محفوظة)`)) return;
+  try { const r = await api('/api/admin/remove-from-group', { method: 'POST', body: JSON.stringify({ phone }) }); alert(r.ok ? 'تمت الإزالة من الجروب' : `تعذرت الإزالة: ${r.reason}`); loadAll(); }
+  catch (e) { alert(e.message); }
+};
+$('login').onclick = () => { loadAll().then(() => { $('panel').hidden = false; $('loginCard').hidden = true; }).catch(() => { }); };
+$('saveSettings').onclick = async () => { try { const r = await api('/api/admin/settings', { method: 'POST', body: JSON.stringify({ whatsappNumber: $('wa').value, groupId: $('group').value, passengerCommission: Number($('cPass').value) || 0.5, orderCommission: Number($('cOrder').value) || 1 }) }); msg($('setMsg'), r.message || 'تم الحفظ — الجروب مربوط وجاهز للإزالة', true); } catch (e) { msg($('setMsg'), e.message); } };
+$('verifyGroup').onclick = async () => {
+  try { const r = await api('/api/admin/verify-group', { method: 'POST' }); msg($('setMsg'), r.message, true); loadAll(); }
+  catch (e) { msg($('setMsg'), e.message); }
+};
+$('createAcc').onclick = async () => {
+  try { const a = await api('/api/admin/accountants', { method: 'POST', body: JSON.stringify({ name: $('accName').value, phone: $('accPhone').value, email: $('accEmail').value, password: $('accPass').value }) }); msg($('accMsg'), `تم الإنشاء — الرقم السري: ${a.pin}`, true); loadAll(); }
+  catch (e) { msg($('accMsg'), e.message); }
+};
+$('createCap').onclick = async () => {
+  try { const c = await api('/api/admin/captains', { method: 'POST', body: JSON.stringify({ name: $('capName').value, phone: $('capPhone').value, email: $('capEmail').value, password: $('capPass').value }) }); msg($('capMsg'), `تم الإنشاء — الرقم السري: ${c.pin}`, true); loadAll(); }
+  catch (e) { msg($('capMsg'), e.message); }
+};
+$('topup').onclick = async () => {
+  try { const r = await api('/api/admin/topup', { method: 'POST', body: JSON.stringify({ phone: $('topPhone').value, amount: Number($('topAmount').value) }) }); msg($('topMsg'), `تم الشحن — الرصيد الآن ${money(r.balance)}`, true); loadAll(); }
+  catch (e) { msg($('topMsg'), e.message); }
+};
+$('withdraw').onclick = async () => {
+  try { const r = await api('/api/admin/withdraw', { method: 'POST', body: JSON.stringify({ phone: $('wdPhone').value, amount: Number($('wdAmount').value) }) }); msg($('wdMsg'), `تم السحب — الرصيد الآن ${money(r.balance)}`, true); loadAll(); }
+  catch (e) { msg($('wdMsg'), e.message); }
+};
+$('addPair').onclick = async () => {
+  try { await api('/api/admin/pairs', { method: 'POST', body: JSON.stringify({ consumerPhone: $('pairConsumer').value, productPhone: $('pairProduct').value }) }); msg($('pairMsg'), 'تم الربط', true); loadAll(); }
+  catch (e) { msg($('pairMsg'), e.message); }
+};
+$('refreshLedger').onclick = renderLedger;
+$('search').oninput = renderAccounts;
