@@ -95,6 +95,18 @@ async function removeParticipant(groupId, phone) {
   return { attempted: true, performed };
 }
 
+// إضافة عضو للجروب (إعادة عضو مُزال — بياناته كانت محفوظة)
+async function addParticipant(groupId, phone) {
+  if (!socket) throw new Error('Baileys غير متصل');
+  const participant = `${phoneFromJid(phone)}@s.whatsapp.net`;
+  const result = await socket.groupParticipantsUpdate(groupId, [participant], 'add');
+  const status = result?.[0]?.status;
+  // 200 = انضاف مباشرة، 403/408 = انرفع له طلب انضمام (الجروب يحتاج موافقة) — نعتبرها نجاح
+  const performed = status === '200' || status === '403' || status === '408';
+  if (!performed) throw new Error(`تعذر إضافة ${phone} للجروب (رمز الحالة: ${status})`);
+  return { attempted: true, performed };
+}
+
 // تحويل رابط دعوة الجروب (https://chat.whatsapp.com/XXXX) إلى معرف جروب حقيقي
 async function resolveGroupFromLink(link) {
   if (!socket) throw new Error('Baileys غير متصل');
@@ -115,7 +127,7 @@ async function checkGroup(groupId) {
 function startControlServer() {
   http.createServer((request, response) => {
     const url = request.url.split('?')[0];
-    if (request.method !== 'POST' || !['/remove-participant', '/resolve-group', '/check-group'].includes(url) || request.headers['x-baileys-key'] !== CONTROL_KEY) {
+    if (request.method !== 'POST' || !['/remove-participant', '/add-participant', '/resolve-group', '/check-group'].includes(url) || request.headers['x-baileys-key'] !== CONTROL_KEY) {
       response.writeHead(404);
       response.end();
       return;
@@ -133,6 +145,12 @@ function startControlServer() {
         }
         if (url === '/check-group') {
           const result = await checkGroup(body.groupId);
+          response.writeHead(200, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ ok: true, ...result }));
+          return;
+        }
+        if (url === '/add-participant') {
+          const result = await addParticipant(body.groupId, body.phone);
           response.writeHead(200, { 'Content-Type': 'application/json' });
           response.end(JSON.stringify({ ok: true, ...result }));
           return;
@@ -235,4 +253,4 @@ startBot().catch(error => {
   console.error('تعذر تشغيل Baileys:', error);
 });
 
-module.exports = { removeParticipant, set onQR(fn) { onQRCallback = fn; }, set onConnected(fn) { onConnectedCallback = fn; } };
+module.exports = { removeParticipant, addParticipant, set onQR(fn) { onQRCallback = fn; }, set onConnected(fn) { onConnectedCallback = fn; } };

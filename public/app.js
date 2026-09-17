@@ -14,7 +14,7 @@ let accounts = [];
 async function loadAll() {
   try {
     accounts = await api('/api/admin/accounts');
-    renderAccounts(); renderCommissions(); renderLedger();
+    renderAccounts(); renderCommissions(); renderLedger(); renderRequests();
     const s = await api('/api/admin/settings');
     $('wa').value = s.whatsappNumber || ''; $('group').value = s.groupId || '';
     $('cPass').value = s.passengerCommission ?? 0.5; $('cOrder').value = s.orderCommission ?? 1;
@@ -23,14 +23,21 @@ async function loadAll() {
 function renderCommissions() {
   $('cConsumption').textContent = money(accounts.commissions.consumption);
   $('cProduction').textContent = money(accounts.commissions.production);
+  const totals = accounts.totals || { passengers: 0, orders: 0, special: 0 };
+  const el = document.getElementById('tPassengers');
+  if (el) el.textContent = totals.passengers;
+  const elO = document.getElementById('tOrders');
+  if (elO) elO.textContent = totals.orders;
+  const elS = document.getElementById('tSpecial');
+  if (elS) elS.textContent = totals.special;
 }
 function accountRow(a, kind) {
   const roleLabel = kind === 'acc' ? 'محاسب' : (a.role === 'consumption' ? 'مستهلك' : 'منتج');
   const stats = a.stats ? ` · 🚶 ${a.stats.passengers || 0} راكب · 📦 ${a.stats.orders || 0} أوردر` : '';
   return `<div class="ledger"><span><b>${esc(a.name)}</b> <small>${roleLabel} · ${a.phone} · ${esc(a.email || '')} · الرقم السري: ${a.pin}${stats}</small></span>
  <span class="actions"><b class="${a.balance > 0 ? 'ok' : 'bad'}">${money(a.balance)}</b>
-  ${a.removedFromGroup ? '<small class="bad">مزال من الجروب</small>' : ''}
- <button onclick="removeFromGroup('${a.phone}')">إزالة من الجروب</button></span></div>`;
+  ${a.removedFromGroup ? `<small class="bad">مزال من الجروب</small> <button onclick="addToGroup('${a.phone}')">إضافة للجروب</button>` : ''}
+  ${a.removedFromGroup ? '' : `<button onclick="removeFromGroup('${a.phone}')">إزالة من الجروب</button>`}<button onclick="deleteAccount('${a.phone}', '${esc(a.name)}')" style="background:#c0392b">حذف الحساب</button></span></div>`;
 }
 function renderAccounts() {
   const q = $('search').value.trim().replace(/\D/g, '');
@@ -48,6 +55,16 @@ async function renderLedger() {
     $('ledger').innerHTML = ledger.map(e => `<div class="ledger"><span>${label[e.type] || e.type}<small>${e.phone} ${e.note || ''} ${e.createdAt}</small></span><b class="${e.amount < 0 ? 'bad' : 'ok'}">${e.amount > 0 ? '+' : ''}${money(e.amount)}</b></div>`).join('') || '<small>لا يوجد عمليات</small>';
   } catch (e) { }
 }
+window.deleteAccount = async (phone, name) => {
+  if (!confirm(`⚠️ حذف حساب ${name} (${phone}) نهائيًا؟\nسيُزال من جروب الواتساب وستُحذف كل بياناته وروابطه — لا يمكن التراجع!`)) return;
+  try { const r = await api('/api/admin/delete-account', { method: 'POST', body: JSON.stringify({ phone }) }); alert(r.removedFromGroup ? 'تم حذف الحساب وإزالته من الجروب' : `تم حذف الحساب (تعذرت إزالته من الجروب: ${r.reason || 'غير محدد'})`); loadAll(); }
+  catch (e) { alert(e.message); }
+};
+window.addToGroup = async phone => {
+  if (!confirm(`إعادة ${phone} إلى جروب الواتساب؟`)) return;
+  try { const r = await api('/api/admin/add-to-group', { method: 'POST', body: JSON.stringify({ phone }) }); alert(r.ok ? 'تمت الإضافة للجروب' : `تعذرت الإضافة: ${r.reason}`); loadAll(); }
+  catch (e) { alert(e.message); }
+};
 window.removeFromGroup = async phone => {
   if (!confirm(`إزالة ${phone} من جروب الواتساب؟ (بياناته ستبقى محفوظة)`)) return;
   try { const r = await api('/api/admin/remove-from-group', { method: 'POST', body: JSON.stringify({ phone }) }); alert(r.ok ? 'تمت الإزالة من الجروب' : `تعذرت الإزالة: ${r.reason}`); loadAll(); }
@@ -81,3 +98,21 @@ $('addPair').onclick = async () => {
 };
 $('refreshLedger').onclick = renderLedger;
 $('search').oninput = renderAccounts;
+
+// ============ طلبات إنشاء الحساب ============
+async function renderRequests() {
+  try {
+    const requests = await api('/api/admin/signup-requests');
+    $('signupRequestsCard').hidden = requests.length === 0;
+    $('signupRequests').innerHTML = requests.map(r => `<div class="ledger"><span><b>${esc(r.name)}</b><small>${r.phone} · ${esc(r.email || '')} · ${r.createdAt}</small></span><span class="actions"><button onclick="approveReq('${r.id}')">موافقة وإنشاء</button><button onclick="rejectReq('${r.id}')" style="background:#c0392b">رفض</button></span></div>`).join('') || '<small>لا يوجد طلبات معلقة</small>';
+  } catch { }
+}
+window.approveReq = async id => {
+  try { const c = await api(`/api/admin/signup-requests/${id}/approve`, { method: 'POST' }); alert(`تم إنشاء حساب ${c.name} — الرقم السري: ${c.pin}`); renderRequests(); loadAll(); }
+  catch (e) { alert(e.message); }
+};
+window.rejectReq = async id => {
+  if (!confirm('رفض هذا الطلب؟')) return;
+  try { await api(`/api/admin/signup-requests/${id}/reject`, { method: 'POST' }); renderRequests(); }
+  catch (e) { alert(e.message); }
+};

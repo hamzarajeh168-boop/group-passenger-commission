@@ -36,3 +36,17 @@ $('login').onclick = async () => {
 $('password').onkeydown = e => { if (e.key === 'Enter') $('login').click(); };
 $('logout').onclick = () => { localStorage.removeItem('shahm-captain-token'); location.reload(); };
 if (token()) loadMe();
+// ============ إنشاء حساب بموافقة الإدارة ============
+$('showSignup').onclick = () => { $('signupCard').hidden = false; $('signupCard').style.display = ''; $('signupCard').previousElementSibling.hidden = true; };
+$('backLogin').onclick = () => { $('signupCard').hidden = true; $('signupCard').previousElementSibling.hidden = false; };
+$('signup').onclick = async () => {
+  const el = $('signupMsg');
+  try {
+    const r = await fetch('/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: $('suName').value, phone: $('suPhone').value, email: $('suEmail').value, password: $('suPass').value }) });
+    const d = await r.json();
+    if (!r.ok) throw Error(d.error || 'تعذر إرسال الطلب');
+    el.textContent = d.message;
+    el.className = 'ok';
+    $('suName').value = $('suPhone').value = $('suEmail').value = $('suPass').value = '';
+  } catch (e) { el.textContent = e.message; el.className = 'bad'; }
+};

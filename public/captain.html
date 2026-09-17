@@ -23,10 +23,24 @@
         <section class="grid" id="loginCard">
             <article>
                 <h2>دخول الكابتن</h2>
-                <p class="hint">الدخول برقم الهاتف وكلمة السر (تُنشأ من الإدارة فقط)</p><label>رقم الهاتف<input
-                        id="phone"></label><label>كلمة السر<input id="password" type="password"></label><button
+                <p class="hint">الدخول برقم الهاتف وكلمة السر (تُنشأ من الإدارة فقط)</p><label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر</small><input
+                        id="phone" inputmode="tel"></label><label>كلمة السر<input id="password" type="password"></label><button
                     id="login">دخول</button>
                 <p id="loginMsg"></p>
+                <hr style="margin:14px 0;border:none;border-top:1px solid #eee">
+                <p class="hint">ما عندك حساب؟ سجّل وستُراجع إدارة النظام طلبك قبل التفعيل</p>
+                <button id="showSignup" type="button">إنشاء حساب جديد</button>
+            </article>
+            <article id="signupCard" hidden>
+                <h2>إنشاء حساب كابتن</h2>
+                <p class="hint">سيُنشأ طلب حساب جديد لكن <b>لن تستطيع الدخول إلا بعد موافقة الإدارة</b></p>
+                <label>الاسم<input id="suName"></label>
+                <label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر — يُضاف 962 تلقائيًا</small><input id="suPhone" inputmode="tel"></label>
+                <label>الإيميل (اختياري)<input id="suEmail" type="email"></label>
+                <label>كلمة السر<input id="suPass" type="password"></label>
+                <button id="signup">إرسال الطلب للإدارة</button>
+                <button id="backLogin" type="button" style="background:#888">رجوع للدخول</button>
+                <p id="signupMsg"></p>
             </article>
         </section>
 

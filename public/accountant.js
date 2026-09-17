@@ -41,10 +41,15 @@ $('sendBalance').onclick = async () => {
   catch (e) { msg($('sendMsg'), e.message); }
 };
 $('searchBtn').onclick = async () => {
-  try {
-    const r = await api('/api/accountant/search?phone=' + encodeURIComponent($('rmPhone').value));
-    $('searchResult').innerHTML = `<div class="ledger"><span><b>${esc(r.name)}</b> <small>${r.role} · ${r.phone} · الرصيد ${money(r.balance)}${r.removedFromGroup ? ' · مزال مسبقًا' : ''}</small></span><button onclick="doRemove('${r.phone}')">إزالة</button></div>`;
+  try { const r = await api('/api/accountant/search?phone=' + encodeURIComponent($('rmPhone').value));
+    const btn = r.removedFromGroup ? `<button onclick="doAdd('${r.phone}')">إضافة للجروب</button>` : `<button onclick="doRemove('${r.phone}')">إزالة</button>`;
+    $('searchResult').innerHTML = `<div class="ledger"><span><b>${esc(r.name)}</b> <small>${r.role} · ${r.phone} · الرصيد ${money(r.balance)}${r.removedFromGroup ? ' · مزال مسبقًا' : ''}</small></span>${btn}</div>`;
   } catch (e) { $('searchResult').innerHTML = `<small class="bad">${e.message}</small>`; }
+};
+window.doAdd = async phone => {
+  if (!confirm(`إعادة ${phone} إلى جروب الواتساب؟`)) return;
+  try { const r = await api('/api/accountant/add-to-group', { method: 'POST', body: JSON.stringify({ phone }) }); alert(r.ok ? 'تمت الإضافة للجروب' : `تعذرت الإضافة: ${r.reason}`); loadMe(); }
+  catch (e) { alert(e.message); }
 };
 window.doRemove = async phone => {
   if (!confirm(`إزالة ${phone} من جروب الواتساب؟ بياناته ستبقى محفوظة`)) return;

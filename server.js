@@ -14,7 +14,7 @@ const $=id=>document.getElementById(id),money=v=>Number(v||0).toFixed(2)+' د.أ
 function msg(el,t,ok){el.textContent=t;el.className=ok?'ok':'bad'}
 async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{'Content-Type':'application/json','x-token':token(),...(opt.headers||{})}}),d=await r.json();if(!r.ok)throw Error(d.error||'تعذر تنفيذ العملية');return d}
 function row(c,label){return '<div class="ledger"><span><b>'+c.name+'</b><small>'+label+' · '+c.phone+' · راكب: '+(c.stats?.passengers||0)+' · أوردر: '+(c.stats?.orders||0)+' · خاص: '+(c.stats?.special||0)+'</small></span><b class="'+(c.balance>=0?'ok':'bad')+'">'+money(c.balance)+'</b></div>'}
-async function load(){try{const m=await api('/api/accountant/me');$('accName').textContent=m.name;$('accIdentity').textContent=m.phone+' · الكود: '+m.pin;$('accBalance').textContent=money(m.balance);$('consumers').innerHTML=m.consumers.map(x=>row(x,'مستهلك')).join('')||'<small>لا يوجد مستهلكون</small>';$('products').innerHTML=m.products.map(x=>row(x,'منتج')).join('')||'<small>لا يوجد منتجون</small>';$('panel').hidden=false;$('loginCard').hidden=true}catch(e){msg($('loginMsg'),e.message)}}
+async function load(){try{const m=await api('/api/accountant/me');$('accName').textContent=m.name;$('accIdentity').textContent=m.phone+' · الكود: '+m.pin;$('accBalance').textContent=money(m.balance);const t=m.totals||{passengers:0,orders:0,special:0};$('tPassengers').textContent=t.passengers;$('tOrders').textContent=t.orders;$('tSpecial').textContent=t.special;$('consumers').innerHTML=m.consumers.map(x=>row(x,'مستهلك')).join('')||'<small>لا يوجد مستهلكون</small>';$('products').innerHTML=m.products.map(x=>row(x,'منتج')).join('')||'<small>لا يوجد منتجون</small>';$('panel').hidden=false;$('loginCard').hidden=true}catch(e){msg($('loginMsg'),e.message)}}
 $('login').onclick=async()=>{try{const r=await api('/api/accountant/login',{method:'POST',body:JSON.stringify({phone:$('phone').value,password:$('password').value})});localStorage.setItem('shahm-token',r.token);load()}catch(e){msg($('loginMsg'),e.message)}};
 $('logout').onclick=()=>{localStorage.removeItem('shahm-token');location.reload()};
 $('sendBalance').onclick=async()=>{try{const r=await api('/api/accountant/send-balance',{method:'POST',body:JSON.stringify({phone:$('sendPhone').value,amount:Number($('sendAmount').value)})});msg($('sendMsg'),'تم الإرسال. رصيدك الآن '+money(r.balance),true);load()}catch(e){msg($('sendMsg'),e.message)}};
@@ -66,6 +66,7 @@ function defaultState() {
     accountants: [],
     captains: [],
     pairs: [],
+    signupRequests: [],
     ledger: [],
     sessions: {},
     messages: []
@@ -73,6 +74,24 @@ function defaultState() {
 }
 
 let cache = null;   // الحالة بالذاكرة للقراءة الفورية
+
+// ترحيل أرقام قديمة للصيغة الدولية 962 — يُنفذ مرة عند كل إقلاع
+function migratePhones(s) {
+  let changed = 0;
+  const mig = list => {
+    (list || []).forEach(o => {
+      const np = normPhone(o.phone);
+      if (np && np !== o.phone) { o.phone = np; changed++; }
+    });
+  };
+  mig(s.captains); mig(s.accountants);
+  (s.pairs || []).forEach(p => {
+    const c = normPhone(p.consumerPhone), pr = normPhone(p.productPhone);
+    if (c !== p.consumerPhone || pr !== p.productPhone) { p.consumerPhone = c; p.productPhone = pr; changed++; }
+  });
+  if (changed) console.log(`تم ترحيل ${changed} رقم للصيغة الدولية 962`);
+  return changed;
+}
 
 async function initDB() {
   // بدون DATABASE_URL: تشغيل محلي بالملف — بدون قاعدة بيانات
@@ -94,6 +113,58 @@ async function initDB() {
 
 function load() { return cache || defaultState(); }
 
+// ============ طلبات إنشاء حساب كابتن (تتطلب موافقة الإدارة) ============
+// طلب جديد من صفحة الكابتن — يبقى معلق حتى توافق الإدارة
+app.post('/api/signup', (req, res) => {
+  const s = load();
+  s.signupRequests = s.signupRequests || [];
+  const phone = normPhone(req.body.phone);
+  const name = String(req.body.name || '').trim();
+  const password = String(req.body.password || '');
+  if (!phone || !name || !password) return res.status(400).json({ error: 'الاسم ورقم الهاتف وكلمة السر مطلوبة' });
+  if (findCaptain(s, phone) || findAccountant(s, phone)) return res.status(409).json({ error: 'هذا الرقم مسجل مسبقًا — سجل دخول مباشرة' });
+  if (s.signupRequests.some(r => r.phone === phone && r.status === 'pending')) return res.status(409).json({ error: 'لديك طلب معلق بالفعل — انتظر موافقة الإدارة' });
+  const request = { id: id(), name, phone, email: String(req.body.email || '').trim(), password, status: 'pending', createdAt: new Date().toISOString() };
+  s.signupRequests.unshift(request);
+  save(s);
+  res.status(201).json({ ok: true, message: 'تم إرسال طلبك — لن تستطيع الدخول حتى توافق الإدارة على حسابك' });
+});
+
+// عرض الطلبات المعلقة للإدارة
+app.get('/api/admin/signup-requests', (req, res) => {
+  if (!admin(req, res)) return;
+  const s = load();
+  res.json((s.signupRequests || []).filter(r => r.status === 'pending'));
+});
+
+// موافقة الإدارة → ينشأ حساب الكابتن فعليًا
+app.post('/api/admin/signup-requests/:id/approve', (req, res) => {
+  if (!admin(req, res)) return;
+  const s = load();
+  s.signupRequests = s.signupRequests || [];
+  const request = s.signupRequests.find(r => r.id === req.params.id && r.status === 'pending');
+  if (!request) return res.status(404).json({ error: 'الطلب غير موجود أو تمت معالجته' });
+  if (findCaptain(s, request.phone)) { request.status = 'rejected'; save(s); return res.status(409).json({ error: 'الرقم مسجل مسبقًا' }); }
+  const c = { id: id(), name: request.name, phone: request.phone, email: request.email || '', password: request.password, pin: String(Math.floor(1000 + Math.random() * 9000)), role: 'consumption', balance: -5, removedFromGroup: false, stats: emptyStats(), createdAt: new Date().toISOString() };
+  addEntry(s, { type: 'opening', phone: c.phone, amount: -5, note: 'رصيد افتتاحي للكابتن (تسجيل ذاتي مع موافقة الإدارة)' });
+  s.captains.unshift(c);
+  request.status = 'approved';
+  save(s);
+  res.status(201).json(c);
+});
+
+// رفض الطلب
+app.post('/api/admin/signup-requests/:id/reject', (req, res) => {
+  if (!admin(req, res)) return;
+  const s = load();
+  s.signupRequests = s.signupRequests || [];
+  const request = s.signupRequests.find(r => r.id === req.params.id && r.status === 'pending');
+  if (!request) return res.status(404).json({ error: 'الطلب غير موجود أو تمت معالجته' });
+  request.status = 'rejected';
+  save(s);
+  res.json({ ok: true });
+});
+
 function save(s) {
   cache = s;
   if (!process.env.DATABASE_URL) {
@@ -108,7 +179,15 @@ function save(s) {
     });
 }
 
-const normPhone = p => String(p || '').replace(/\D/g, '');
+// نحول الرقم للصيغة الدولية: نحذف الأصفار والرموز ونضيف 962 تلقائيًا إن لم توجد
+const normPhone = p => {
+  let digits = String(p || '').replace(/\D/g, '');
+  if (digits.startsWith('00962')) digits = digits.slice(5);
+  else if (digits.startsWith('962')) digits = digits.slice(3);
+  else if (digits.startsWith('0')) digits = digits.slice(1); // صفر البداية المحلي
+  if (digits && !digits.startsWith('962')) digits = '962' + digits;
+  return digits;
+};
 const findCaptain = (s, phone) => s.captains.find(c => c.phone === normPhone(phone));
 const findAccountant = (s, phone) => s.accountants.find(a => a.phone === normPhone(phone));
 
@@ -125,12 +204,35 @@ async function removeFromGroup(phone, groupId) {
   return { performed: false, reason: 'خدمة WhatsApp غير مفعلة' };
 }
 
+// إعادة عضو مُزال إلى جروب الواتساب (بياناته محفوظة)
+async function addToGroup(phone, groupId) {
+  if (!groupId) return { performed: false, reason: 'لم يتم ضبط معرف الجروب بعد' };
+  if (baileys) {
+    const controlUrl = `http://127.0.0.1:${Number(process.env.BAILEYS_CONTROL_PORT || 4101)}/add-participant`;
+    try {
+      const response = await fetch(controlUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-baileys-key': process.env.BAILEYS_CONTROL_KEY || 'shahm-local' }, body: JSON.stringify({ groupId, phone: normPhone(phone) }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) return { performed: false, reason: data.error || `Baileys أرجع HTTP ${response.status}` };
+      return { performed: true };
+    } catch (error) { return { performed: false, reason: `Baileys غير متصل: ${error.message}` }; }
+  }
+  return { performed: false, reason: 'خدمة WhatsApp غير مفعلة' };
+}
+
 // إزالة تلقائية من الجروب عند صفر الرصيد — البيانات تبقى محفوظة
 async function enforceZeroBalance(s, captain) {
   if (captain.balance > 0 || captain.removedFromGroup) return;
   captain.removedFromGroup = true;
   const result = await removeFromGroup(captain.phone, s.settings.groupId);
   s.ledger.unshift({ id: id(), type: 'system', phone: captain.phone, amount: 0, note: `أزيل من جروب الواتساب تلقائيًا لأن رصيده صفر${result.performed ? '' : ` (${result.reason || ''})`}`, createdAt: new Date().toISOString() });
+}
+
+// إعادة تلقائية للجروب عند ما رصيد الكابتن يصير فوق الصفر
+async function reactivateOnPositiveBalance(s, captain) {
+  if (!captain || !captain.removedFromGroup || !(captain.balance > 0)) return;
+  const result = await addToGroup(captain.phone, s.settings.groupId);
+  if (result.performed) captain.removedFromGroup = false;
+  s.ledger.unshift({ id: id(), type: 'system', phone: captain.phone, amount: 0, note: `رجع إلى جروب الواتساب تلقائيًا لأن رصيده صار فوق الصفر${result.performed ? '' : ` (تعذرت الإضافة: ${result.reason || ''})`}`, createdAt: new Date().toISOString() });
 }
 
 function addEntry(s, { type, phone, amount, note, linkedPhone }) {
@@ -178,6 +280,11 @@ app.get('/api/admin/accounts', (req, res) => {
     accountants: s.accountants.map(a => ({ id: a.id, name: a.name, phone: a.phone, email: a.email, pin: a.pin, balance: a.balance, removedFromGroup: !!a.removedFromGroup })),
     captains: s.captains.map(c => ({ id: c.id, name: c.name, phone: c.phone, email: c.email, pin: c.pin, role: c.role, balance: c.balance, removedFromGroup: !!c.removedFromGroup, stats: c.stats || emptyStats() })),
     pairs: s.pairs,
+    totals: {
+      passengers: s.captains.reduce((t, c) => t + (c.stats?.passengers || 0), 0),
+      orders: s.captains.reduce((t, c) => t + (c.stats?.orders || 0), 0),
+      special: s.captains.reduce((t, c) => t + (c.stats?.special || 0), 0)
+    },
     commissions: {
       consumption: money(s.ledger.filter(e => e.type === 'consumption').reduce((t, e) => t + Math.abs(Number(e.amount) || 0), 0)),
       production: money(s.ledger.filter(e => e.type === 'production').reduce((t, e) => t + Math.abs(Number(e.amount) || 0), 0))
@@ -220,7 +327,7 @@ app.post('/api/admin/topup', async (req, res) => {
   const c = findCaptain(s, phone) || findAccountant(s, phone);
   if (!c) return res.status(404).json({ error: 'رقم غير موجود في النظام' });
   c.balance = money(c.balance + amount);
-  if (s.captains.includes(c) && c.removedFromGroup && c.balance > 0) c.removedFromGroup = false;
+  if (s.captains.includes(c)) await reactivateOnPositiveBalance(s, c);
   addEntry(s, { type: 'topup', phone, amount, note: 'شحن رصيد من غرفة الإدارة' });
   save(s); res.json({ balance: c.balance });
 });
@@ -254,6 +361,45 @@ app.post('/api/admin/remove-from-group', async (req, res) => {
   addEntry(s, { type: 'system', phone, amount: 0, note: `إزالة من جروب الواتساب${result.performed ? '' : ` (${result.reason || ''})`}` });
   save(s);
   res.json({ ok: result.performed, reason: result.reason || '' });
+});
+
+// إعادة عضو مُزال إلى جروب الواتساب (الشرط: رصيده أكبر من صفر — وإلا ينزال تلقائيًا من جديد)
+app.post('/api/admin/add-to-group', async (req, res) => {
+  if (!admin(req, res)) return;
+  const s = load();
+  const phone = normPhone(req.body.phone);
+  const acc = findAccountant(s, phone);
+  const c = findCaptain(s, phone);
+  if (!acc && !c) return res.status(404).json({ error: 'رقم غير موجود في النظام' });
+  const target = acc || c;
+  if (!target.removedFromGroup) return res.status(400).json({ error: 'هذا الحساب غير مُزال من الجروب' });
+  if (c && c.balance <= 0) return res.status(400).json({ error: `لا يمكن الإضافة للجروب: رصيد الكابتن ${money(c.balance)} — اشحن رصيد أولًا` });
+  const result = await addToGroup(phone, s.settings.groupId);
+  if (result.performed) target.removedFromGroup = false;
+  addEntry(s, { type: 'system', phone, amount: 0, note: `إعادة إلى جروب الواتساب${result.performed ? '' : ` (تعذرت الإضافة: ${result.reason || ''})`}` });
+  save(s);
+  res.json({ ok: result.performed, reason: result.reason || '' });
+});
+
+// حذف حساب نهائي: يزيل من الجروب أولًا ثم يحذف الحساب وسجل السير (الروابط المرتبطة تُحذف أيضًا)
+app.post('/api/admin/delete-account', async (req, res) => {
+  if (!admin(req, res)) return;
+  const s = load();
+  const phone = normPhone(req.body.phone);
+  const accIdx = s.accountants.findIndex(a => a.phone === phone);
+  const capIdx = s.captains.findIndex(c => c.phone === phone);
+  if (accIdx === -1 && capIdx === -1) return res.status(404).json({ error: 'رقم غير موجود في النظام' });
+  // إزالة من جروب الواتساب قبل الحذف (أفضل جهد — الحذف يتم حتى لو فشلت الإزالة)
+  const result = await removeFromGroup(phone, s.settings.groupId);
+  if (accIdx !== -1) s.accountants.splice(accIdx, 1);
+  if (capIdx !== -1) s.captains.splice(capIdx, 1);
+  // حذف أي روابط ربط تتضمن هذا الرقم
+  s.pairs = (s.pairs || []).filter(p => p.consumerPhone !== phone && p.productPhone !== phone);
+  // حذف جلساته النشطة
+  Object.keys(s.sessions || {}).forEach(tk => { if (s.sessions[tk].phone === phone) delete s.sessions[tk]; });
+  addEntry(s, { type: 'system', phone, amount: 0, note: `حذف حساب نهائي من النظام${result.performed ? ' (وأزيل من الجروب)' : ` (تعذرت إزالته من الجروب: ${result.reason || ''})`}` });
+  save(s);
+  res.json({ ok: true, removedFromGroup: result.performed, reason: result.reason || '' });
 });
 
 // ربط مستهلك بمنتج
@@ -343,11 +489,13 @@ app.get('/api/accountant/me', (req, res) => {
   const acc = accountantAuth(req, res, s); if (!acc) return;
   const consumers = s.captains.filter(c => c.role === 'consumption').map(c => ({ phone: c.phone, name: c.name, balance: c.balance, stats: c.stats || emptyStats(), linkedPhone: (s.pairs.find(p => p.consumerPhone === c.phone) || {}).productPhone || '' }));
   const products = s.captains.filter(c => c.role === 'production').map(c => ({ phone: c.phone, name: c.name, balance: c.balance, stats: c.stats || emptyStats(), linkedPhone: (s.pairs.find(p => p.productPhone === c.phone) || {}).consumerPhone || '' }));
-  res.json({ name: acc.name, phone: acc.phone, pin: acc.pin, balance: acc.balance, consumers, products });
+  const all = [...consumers, ...products];
+  const totals = { passengers: all.reduce((t, c) => t + (c.stats.passengers || 0), 0), orders: all.reduce((t, c) => t + (c.stats.orders || 0), 0), special: all.reduce((t, c) => t + (c.stats.special || 0), 0) };
+  res.json({ name: acc.name, phone: acc.phone, pin: acc.pin, balance: acc.balance, consumers, products, totals });
 });
 
 // إرسال رصيد من محفظة المحاسب فقط
-app.post('/api/accountant/send-balance', (req, res) => {
+app.post('/api/accountant/send-balance', async (req, res) => {
   const s = load();
   const acc = accountantAuth(req, res, s); if (!acc) return;
   const amount = money(req.body.amount);
@@ -358,6 +506,7 @@ app.post('/api/accountant/send-balance', (req, res) => {
   target.balance = money(target.balance + amount);
   addEntry(s, { type: 'transfer', phone: acc.phone, amount: -amount, note: `إرسال رصيد إلى ${target.phone}`, linkedPhone: target.phone });
   addEntry(s, { type: 'transfer', phone: target.phone, amount, note: `استلام رصيد من المحاسب ${acc.phone}`, linkedPhone: acc.phone });
+  if (s.captains.includes(target)) await reactivateOnPositiveBalance(s, target);
   save(s); res.json({ balance: acc.balance });
 });
 
@@ -434,11 +583,12 @@ app.post('/api/accountant/entry', async (req, res) => {
   product.stats.totalCommission = money((product.stats.totalCommission || 0) + amount);
   addEntry(s, { type: 'production', phone: product.phone, amount, note: `إنتاج مقابل ${phone} — ${note}`, linkedPhone: phone });
   await enforceZeroBalance(s, consumer);
+  await reactivateOnPositiveBalance(s, product);
   save(s);
   res.json({ ok: true, amount, quantity, unitValue, category });
 });
 
-app.post('/api/accountant/entry-legacy', (req, res) => {
+app.post('/api/accountant/entry-legacy', async (req, res) => {
   const s = load();
   const acc = accountantAuth(req, res, s); if (!acc) return;
   const phone = normPhone(req.body.phone);
@@ -469,6 +619,7 @@ app.post('/api/accountant/entry-legacy', (req, res) => {
     addEntry(s, { type: 'production', phone, amount, note: 'إضافة قيمة إنتاج بواسطة المحاسب' });
   }
   enforceZeroBalance(s, c);
+  await reactivateOnPositiveBalance(s, c);
   save(s); res.json({ ok: true });
 });
 
@@ -530,6 +681,7 @@ app.post('/webhook/group', async (req, res) => {
       }
     }
     await enforceZeroBalance(s, requester);
+    if (pair) await reactivateOnPositiveBalance(s, findCaptain(s, pair.productPhone));
     save(s);
     return res.json({ ok: true, status: 'charged', category, commission: rate });
   }
@@ -611,6 +763,7 @@ app.get('/accountant', (_, res) => res.sendFile(path.join(__dirname, 'public', '
 app.get('/captain', (_, res) => res.sendFile(path.join(__dirname, 'public', 'captain.html')));
 initDB()
   .then(() => {
+    migratePhones(load()); if (process.env.DATABASE_URL) save(load()); else save(load());
     app.listen(PORT, '0.0.0.0', () => console.log(`Shahm running on ${PORT} — البيانات محفوظة دائمًا`));
   })
   .catch(err => {
@@ -618,5 +771,6 @@ initDB()
     console.log('نكمل بالوضع المحلي (الملف data/state.json)...');
     cache = null;
     try { cache = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch { cache = defaultState(); }
+    migratePhones(cache); save(cache);
     app.listen(PORT, '0.0.0.0', () => console.log(`Shahm running on ${PORT} — وضع محلي`));
   });
