@@ -5,4 +5,8 @@ auth_info/
 npm-debug.log*
 *.log
 *.bak
+.aicode/
+.vscode/
+cloudflared*/
+shahm-server.*.log
 
