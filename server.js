@@ -8,6 +8,22 @@ const PORT = process.env.PORT || 4000;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'shahm-2026';
 const FILE = path.join(__dirname, 'data', 'state.json');
 app.use(express.json({ limit: '2mb' }));
+// واجهة المحاسب تُقدَّم من الخادم كي تبقى متوافقة مع بيئات النشر التي تجعل public للقراءة فقط.
+app.get('/accountant.js', (_, res) => res.type('application/javascript').send(String.raw`
+const $=id=>document.getElementById(id),money=v=>Number(v||0).toFixed(2)+' د.أ',token=()=>localStorage.getItem('shahm-token')||'';
+function msg(el,t,ok){el.textContent=t;el.className=ok?'ok':'bad'}
+async function api(url,opt={}){const r=await fetch(url,{...opt,headers:{'Content-Type':'application/json','x-token':token(),...(opt.headers||{})}}),d=await r.json();if(!r.ok)throw Error(d.error||'تعذر تنفيذ العملية');return d}
+function row(c,label){return '<div class="ledger"><span><b>'+c.name+'</b><small>'+label+' · '+c.phone+' · راكب: '+(c.stats?.passengers||0)+' · أوردر: '+(c.stats?.orders||0)+' · خاص: '+(c.stats?.special||0)+'</small></span><b class="'+(c.balance>=0?'ok':'bad')+'">'+money(c.balance)+'</b></div>'}
+async function load(){try{const m=await api('/api/accountant/me');$('accName').textContent=m.name;$('accIdentity').textContent=m.phone+' · الكود: '+m.pin;$('accBalance').textContent=money(m.balance);$('consumers').innerHTML=m.consumers.map(x=>row(x,'مستهلك')).join('')||'<small>لا يوجد مستهلكون</small>';$('products').innerHTML=m.products.map(x=>row(x,'منتج')).join('')||'<small>لا يوجد منتجون</small>';$('panel').hidden=false;$('loginCard').hidden=true}catch(e){msg($('loginMsg'),e.message)}}
+$('login').onclick=async()=>{try{const r=await api('/api/accountant/login',{method:'POST',body:JSON.stringify({phone:$('phone').value,password:$('password').value})});localStorage.setItem('shahm-token',r.token);load()}catch(e){msg($('loginMsg'),e.message)}};
+$('logout').onclick=()=>{localStorage.removeItem('shahm-token');location.reload()};
+$('sendBalance').onclick=async()=>{try{const r=await api('/api/accountant/send-balance',{method:'POST',body:JSON.stringify({phone:$('sendPhone').value,amount:Number($('sendAmount').value)})});msg($('sendMsg'),'تم الإرسال. رصيدك الآن '+money(r.balance),true);load()}catch(e){msg($('sendMsg'),e.message)}};
+$('searchBtn').onclick=async()=>{try{const r=await api('/api/accountant/remove-from-group',{method:'POST',body:JSON.stringify({phone:$('rmPhone').value})});msg($('searchResult'),r.ok?'تمت إزالة العضو':'تعذرت الإزالة: '+r.reason,r.ok);load()}catch(e){msg($('searchResult'),e.message)}};
+const old=$('entryPhone').closest('article');old.hidden=true;const box=document.createElement('article');box.className='wide';box.innerHTML='<h2>تسجيل عمولة: مستهلك ← منتج</h2><p class="hint">العدد × قيمة الوحدة = إجمالي الخصم من المستهلك والإضافة للمنتج المرتبط.</p><div class="row"><input id="nPhone" placeholder="رقم المستهلك"><select id="nCategory"><option value="passengers">راكب</option><option value="orders">أوردر</option><option value="special">عمولة خاصة</option></select><input id="nQty" type="number" value="1" min="1" step="1" placeholder="العدد"><input id="nRate" type="number" min=".01" step=".01" placeholder="قيمة الوحدة"></div><p id="nTotal" class="hint">الإجمالي: 0.00 د.أ</p><button id="nSave">تسجيل العملية</button><p id="nMsg"></p>';
+old.before(box);const total=()=>{$('nTotal').textContent='الإجمالي: '+money((Number($('nQty').value)||0)*(Number($('nRate').value)||0))};$('nQty').oninput=total;$('nRate').oninput=total;
+$('nSave').onclick=async()=>{try{const r=await api('/api/accountant/entry',{method:'POST',body:JSON.stringify({phone:$('nPhone').value,category:$('nCategory').value,quantity:Number($('nQty').value),unitValue:Number($('nRate').value)})});msg($('nMsg'),'تم تسجيل '+r.quantity+' × '+r.unitValue+' = '+money(r.amount),true);load()}catch(e){msg($('nMsg'),e.message)}};
+if(token())load();
+`));
 app.use(express.static(path.join(__dirname, 'public')));
 
 const id = () => crypto.randomUUID();
@@ -38,7 +54,7 @@ app.get('/api/qr-image', async (_, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-function emptyStats() { return { passengers: 0, orders: 0, totalTrips: 0, totalCommission: 0 }; }
+function emptyStats() { return { passengers: 0, orders: 0, special: 0, totalTrips: 0, totalCommission: 0 }; }
 
 // ============ قاعدة البيانات (Postgres — البيانات لا تضيع أبدًا) ============
 // على Railway: أضف Postgres من New → Database واستخدم متغير DATABASE_URL الجاهز
@@ -46,7 +62,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process
 
 function defaultState() {
   return {
-    settings: { groupId: '', whatsappNumber: '', lastWeeklyDeduct: '', passengerCommission: 0.5, orderCommission: 1 },
+    settings: { groupId: '', whatsappNumber: '', lastWeeklyDeduct: '', passengerCommission: 0.5, orderCommission: 1, specialCommission: 0 },
     accountants: [],
     captains: [],
     pairs: [],
@@ -187,7 +203,9 @@ app.post('/api/admin/captains', (req, res) => {
   const role = req.body.role === 'production' ? 'production' : 'consumption'; // الدور لا يُحدد عند الإنشاء، يُحدد لاحقًا عبر الربط
   if (!phone || !String(req.body.name || '').trim() || !String(req.body.password || '')) return res.status(400).json({ error: 'الاسم ورقم الهاتف وكلمة السر مطلوبة' });
   if (findCaptain(s, phone)) return res.status(409).json({ error: 'الحساب موجود مسبقًا' });
-  const c = { id: id(), name: String(req.body.name).trim(), phone, email: String(req.body.email || '').trim(), password: String(req.body.password), pin: String(Math.floor(1000 + Math.random() * 9000)), role, balance: 0, removedFromGroup: false, stats: emptyStats(), createdAt: new Date().toISOString() };
+  // كل كابتن يبدأ بمديونية تشغيلية ثابتة قدرها 5 دنانير.
+  const c = { id: id(), name: String(req.body.name).trim(), phone, email: String(req.body.email || '').trim(), password: String(req.body.password), pin: String(Math.floor(1000 + Math.random() * 9000)), role, balance: -5, removedFromGroup: false, stats: emptyStats(), createdAt: new Date().toISOString() };
+  addEntry(s, { type: 'opening', phone, amount: -5, note: 'رصيد افتتاحي للكابتن' });
   s.captains.unshift(c); save(s);
   res.status(201).json(c);
 });
@@ -265,9 +283,11 @@ async function resolveGroupLink(link) {
 app.post('/api/admin/settings', async (req, res) => {
   if (!admin(req, res)) return;
   const s = load();
-  s.settings.whatsappNumber = normPhone(req.body.whatsappNumber);
+  if (req.body.whatsappNumber !== undefined) s.settings.whatsappNumber = normPhone(req.body.whatsappNumber);
   if (req.body.passengerCommission !== undefined) s.settings.passengerCommission = money(Math.max(0, Number(req.body.passengerCommission) || 0));
   if (req.body.orderCommission !== undefined) s.settings.orderCommission = money(Math.max(0, Number(req.body.orderCommission) || 0));
+  if (req.body.specialCommission !== undefined) s.settings.specialCommission = money(Math.max(0, Number(req.body.specialCommission) || 0));
+  if (req.body.groupId === undefined) { save(s); return res.json(s.settings); }
   const groupInput = String(req.body.groupId || '').trim();
   s.settings.groupLink = groupInput.includes('chat.whatsapp.com') ? groupInput : (s.settings.groupLink || '');
   if (groupInput.includes('chat.whatsapp.com')) {
@@ -342,6 +362,20 @@ app.post('/api/accountant/send-balance', (req, res) => {
 });
 
 // البحث عن رقم للإزالة من الجروب
+app.post('/api/admin/send-to-accountant', (req, res) => {
+  if (!admin(req, res)) return;
+  const s = load();
+  const phone = normPhone(req.body.phone);
+  const amount = money(req.body.amount);
+  const acc = findAccountant(s, phone);
+  if (!acc) return res.status(404).json({ error: 'المحاسب غير موجود' });
+  if (amount <= 0) return res.status(400).json({ error: 'أدخل مبلغًا موجبًا' });
+  acc.balance = money(acc.balance + amount);
+  addEntry(s, { type: 'admin-transfer', phone, amount, note: 'تحويل من الإدارة إلى محفظة المحاسب', linkedPhone: 'admin' });
+  save(s);
+  res.json({ balance: acc.balance });
+});
+
 app.get('/api/accountant/search', (req, res) => {
   const s = load();
   const acc = accountantAuth(req, res, s); if (!acc) return;
@@ -367,7 +401,44 @@ app.post('/api/accountant/remove-from-group', async (req, res) => {
 
 // إضافة خانة بقيمة: المستهلك دائمًا سالب، والمنتج دائمًا موجب
 // إدخال قيمة للمستهلك يسحبها من محفظته ويعطيها تلقائيًا للمنتج المرتبط به
-app.post('/api/accountant/entry', (req, res) => {
+// القيد المحاسبي الموحد: الاستهلاك دائمًا سالب والإنتاج المقابل دائمًا موجب.
+app.post('/api/accountant/entry', async (req, res) => {
+  const s = load();
+  const acc = accountantAuth(req, res, s); if (!acc) return;
+  const phone = normPhone(req.body.phone);
+  const category = ['passengers', 'orders', 'special'].includes(req.body.category) ? req.body.category : 'passengers';
+  const quantity = Number(req.body.quantity ?? 1);
+  const configuredRate = category === 'orders' ? s.settings.orderCommission : (category === 'special' ? s.settings.specialCommission : s.settings.passengerCommission);
+  const unitValue = money(Math.abs(Number(req.body.unitValue ?? req.body.amount ?? configuredRate) || 0));
+  const amount = money(quantity * unitValue);
+  const consumer = findCaptain(s, phone);
+  if (!consumer) return res.status(404).json({ error: 'الكابتن غير موجود' });
+  if (!Number.isInteger(quantity) || quantity <= 0 || unitValue <= 0 || amount <= 0) return res.status(400).json({ error: 'أدخل عددًا صحيحًا موجبًا وقيمة عمولة موجبة' });
+  if (consumer.role !== 'consumption') return res.status(400).json({ error: 'العمولة تُسجل على كابتن مستهلك فقط' });
+  const pair = s.pairs.find(p => p.consumerPhone === phone);
+  const product = pair && findCaptain(s, pair.productPhone);
+  if (!product) return res.status(400).json({ error: 'اربط المستهلك بكابتن منتج قبل تسجيل العمولة' });
+  if (consumer.balance < amount) return res.status(400).json({ error: 'محفظة المستهلك لا تكفي لإتمام العملية' });
+  consumer.balance = money(consumer.balance - amount);
+  consumer.stats = consumer.stats || emptyStats();
+  consumer.stats[category] = (consumer.stats[category] || 0) + quantity;
+  consumer.stats.totalTrips = (consumer.stats.totalTrips || 0) + quantity;
+  consumer.stats.totalCommission = money((consumer.stats.totalCommission || 0) + amount);
+  const labels = { passengers: 'راكب', orders: 'أوردر', special: 'عمولة خاصة' };
+  const note = `${labels[category]}: ${quantity} × ${unitValue} = ${amount}`;
+  addEntry(s, { type: 'consumption', phone, amount: -amount, note, linkedPhone: product.phone });
+  product.balance = money(product.balance + amount);
+  product.stats = product.stats || emptyStats();
+  product.stats[category] = (product.stats[category] || 0) + quantity;
+  product.stats.totalTrips = (product.stats.totalTrips || 0) + quantity;
+  product.stats.totalCommission = money((product.stats.totalCommission || 0) + amount);
+  addEntry(s, { type: 'production', phone: product.phone, amount, note: `إنتاج مقابل ${phone} — ${note}`, linkedPhone: phone });
+  await enforceZeroBalance(s, consumer);
+  save(s);
+  res.json({ ok: true, amount, quantity, unitValue, category });
+});
+
+app.post('/api/accountant/entry-legacy', (req, res) => {
   const s = load();
   const acc = accountantAuth(req, res, s); if (!acc) return;
   const phone = normPhone(req.body.phone);
@@ -514,7 +585,28 @@ setInterval(() => {
 app.get('/whatsapp-link', (_, res) => res.sendFile(path.join(__dirname, 'public', 'whatsapp-link.html')));
 
 app.get('/api/health', (_, res) => res.json({ ok: true, app: 'شهم' }));
-app.get('/control-room', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/control-room', (_, res) => {
+  const page = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  const enhancement = `<script>
+  (() => {
+    const panel = document.getElementById('panel');
+    const settingsRow = document.getElementById('cOrder')?.parentElement?.parentElement;
+    if (settingsRow && !document.getElementById('cSpecial')) {
+      const label = document.createElement('label'); label.textContent = 'قيمة العمولة الخاصة';
+      label.innerHTML += '<input id="cSpecial" type="number" min="0" step=".01">'; settingsRow.appendChild(label);
+      const save = document.getElementById('saveSettings');
+      save?.addEventListener('click', () => setTimeout(async () => {
+        const key = document.getElementById('key').value.trim();
+        await fetch('/api/admin/settings', { method:'POST', headers:{'Content-Type':'application/json','x-admin-key':key}, body:JSON.stringify({ specialCommission:Number(document.getElementById('cSpecial').value)||0 }) });
+      }, 0));
+    }
+    const transfer = document.createElement('article'); transfer.innerHTML = '<h2>إرسال رصيد للمحاسب</h2><p class="hint">يُضاف الرصيد مباشرة لمحفظة المحاسب.</p><div class="row"><input id="adminAccPhone" placeholder="رقم المحاسب"><input id="adminAccAmount" type="number" min=".01" step=".01" placeholder="المبلغ"></div><button id="adminAccSend">إرسال للمحاسب</button><p id="adminAccMsg"></p>';
+    if (panel && !document.getElementById('adminAccSend')) panel.appendChild(transfer);
+    document.getElementById('adminAccSend')?.addEventListener('click', async () => { const out=document.getElementById('adminAccMsg'); try { const r=await fetch('/api/admin/send-to-accountant',{method:'POST',headers:{'Content-Type':'application/json','x-admin-key':document.getElementById('key').value.trim()},body:JSON.stringify({phone:document.getElementById('adminAccPhone').value,amount:Number(document.getElementById('adminAccAmount').value)})}); const d=await r.json(); if(!r.ok)throw Error(d.error); out.textContent='تم الإرسال. رصيد المحاسب: '+Number(d.balance).toFixed(2)+' د.أ'; out.className='ok'; }catch(e){out.textContent=e.message;out.className='bad';} });
+  })();
+  </script>`;
+  res.type('html').send(page.replace('</body>', enhancement + '</body>'));
+});
 app.get('/accountant', (_, res) => res.sendFile(path.join(__dirname, 'public', 'accountant.html')));
 app.get('/captain', (_, res) => res.sendFile(path.join(__dirname, 'public', 'captain.html')));
 initDB()

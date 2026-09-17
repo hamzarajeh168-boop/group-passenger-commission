@@ -88,8 +88,11 @@ async function forward(event) {
 async function removeParticipant(groupId, phone) {
   if (!socket) throw new Error('Baileys غير متصل');
   const participant = `${phoneFromJid(phone)}@s.whatsapp.net`;
-  await socket.groupParticipantsUpdate(groupId, [participant], 'remove');
-  return { attempted: true, performed: true };
+  const result = await socket.groupParticipantsUpdate(groupId, [participant], 'remove');
+  const status = result?.[0]?.status;
+  const performed = status === '200'; // 200 = تمت الإزالة بنجاح
+  if (!performed) throw new Error(`تعذر إزالة ${phone} من الجروب (رمز الحالة: ${status})`);
+  return { attempted: true, performed };
 }
 
 // تحويل رابط دعوة الجروب (https://chat.whatsapp.com/XXXX) إلى معرف جروب حقيقي
