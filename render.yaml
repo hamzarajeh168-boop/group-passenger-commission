@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: shahm-passenger-group
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    disk:
+      name: shahm-data
+      mountPath: /opt/render/project/src/data
+      sizeGB: 1
