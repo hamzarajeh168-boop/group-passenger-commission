@@ -34,20 +34,21 @@ const baileys = process.env.BAILEYS_ENABLED === 'false' ? null : require('./bail
 
 // آخر QR معروض من البوت (للربط من صفحة الويب)
 let latestQR = '';
+let latestPairingCode = '';
 let botConnected = false;
 if (baileys) {
-  baileys.onQR = qr => { latestQR = qr; botConnected = false; };
+  baileys.onQR = (qr, pairingCode) => { latestQR = qr; latestPairingCode = pairingCode || ''; botConnected = false; };
   baileys.onConnected = () => { latestQR = ''; botConnected = true; };
 }
 app.get('/api/qr-status', (_, res) => {
   if (botConnected) return res.json({ connected: true });
-  res.json({ connected: false, qr: latestQR || '' });
+  res.json({ connected: false, qr: latestQR || '', pairingCode: latestPairingCode });
 });
 
 // صورة QR جاهزة (SVG) لصفحة الربط
 app.get('/api/qr-image', async (_, res) => {
   try {
-    if (botConnected || !latestQR) return res.status(404).json({ error: 'no-qr' });
+    if (botConnected || (!latestQR && !latestPairingCode)) return res.status(404).json({ error: 'no-qr' });
     const QRCode = require('qrcode');
     const svg = await QRCode.toString(latestQR, { type: 'svg', margin: 1, width: 320 });
     res.type('image/svg+xml').send(svg);
@@ -219,20 +220,32 @@ async function addToGroup(phone, groupId) {
   return { performed: false, reason: 'خدمة WhatsApp غير مفعلة' };
 }
 
-// إزالة تلقائية من الجروب عند صفر الرصيد — البيانات تبقى محفوظة
-async function enforceZeroBalance(s, captain) {
-  if (captain.balance > 0 || captain.removedFromGroup) return;
-  captain.removedFromGroup = true;
-  const result = await removeFromGroup(captain.phone, s.settings.groupId);
-  s.ledger.unshift({ id: id(), type: 'system', phone: captain.phone, amount: 0, note: `أزيل من جروب الواتساب تلقائيًا لأن رصيده صفر${result.performed ? '' : ` (${result.reason || ''})`}`, createdAt: new Date().toISOString() });
+// حذف رسالة من الجروب (بدل إزالة الكابتن من الجروب)
+async function deleteGroupMessage(messageId, groupId) {
+  if (!groupId) return { performed: false, reason: 'لم يتم ضبط معرف الجروب بعد' };
+  if (!messageId) return { performed: false, reason: 'لا يوجد معرف رسالة' };
+  if (baileys) {
+    const controlUrl = `http://127.0.0.1:${Number(process.env.BAILEYS_CONTROL_PORT || 4101)}/delete-message`;
+    try {
+      const response = await fetch(controlUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-baileys-key': process.env.BAILEYS_CONTROL_KEY || 'shahm-local' }, body: JSON.stringify({ groupId, messageId }) });
+      if (!response.ok) return { performed: false, reason: `Baileys أرجع HTTP ${response.status}` };
+      return { performed: true };
+    } catch (error) { return { performed: false, reason: `Baileys غير متصل: ${error.message}` }; }
+  }
+  return { performed: false, reason: 'خدمة WhatsApp غير مفعلة' };
 }
 
-// إعادة تلقائية للجروب عند ما رصيد الكابتن يصير فوق الصفر
+// عند صفر الرصيد: ما عاد منزيله من الجروب — رسائله تنحذف تلقائيًا عند الكتابة/اللايك
+async function enforceZeroBalance(s, captain) {
+  if (captain.balance > 0) return;
+  captain.removedFromGroup = false;
+  s.ledger.unshift({ id: id(), type: 'system', phone: captain.phone, amount: 0, note: 'تنبيه: رصيد الكابتن صفر — سيتم حذف رسائله من الجروب تلقائيًا حتى الشحن', createdAt: new Date().toISOString() });
+}
+
+// إعادة تلقائية للجروب عند ما رصيد الكابتن يصير فوق الصفر (لم يُعد منزيل أبدًا — مجرد حذف رسائله)
 async function reactivateOnPositiveBalance(s, captain) {
-  if (!captain || !captain.removedFromGroup || !(captain.balance > 0)) return;
-  const result = await addToGroup(captain.phone, s.settings.groupId);
-  if (result.performed) captain.removedFromGroup = false;
-  s.ledger.unshift({ id: id(), type: 'system', phone: captain.phone, amount: 0, note: `رجع إلى جروب الواتساب تلقائيًا لأن رصيده صار فوق الصفر${result.performed ? '' : ` (تعذرت الإضافة: ${result.reason || ''})`}`, createdAt: new Date().toISOString() });
+  if (!captain) return;
+  if (captain.removedFromGroup && captain.balance > 0) captain.removedFromGroup = false;
 }
 
 function addEntry(s, { type, phone, amount, note, linkedPhone }) {
@@ -483,6 +496,36 @@ app.post('/api/admin/verify-group', async (req, res) => {
   return res.status(400).json({ error: 'لا يوجد جروب محفوظ ولا رابط دعوة — الصق رابط الجروب أولًا' });
 });
 
+// تنظيف الجروب: إزالة أي رقم مش مربوط بحساب (كابتن/محاسب) أو رصيده صفر أو أقل
+app.post('/api/admin/cleanup-group', async (req, res) => {
+  if (!admin(req, res)) return;
+  const s = load();
+  if (!baileys) return res.status(502).json({ error: 'خدمة WhatsApp غير مفعلة' });
+  if (!s.settings.groupId) return res.status(400).json({ error: 'لا يوجد جروب مربوط — اربط الجروب أولًا' });
+  try {
+    const controlUrl = `http://127.0.0.1:${Number(process.env.BAILEYS_CONTROL_PORT || 4101)}/list-participants`;
+    const headers = { 'Content-Type': 'application/json', 'x-baileys-key': process.env.BAILEYS_CONTROL_KEY || 'shahm-local' };
+    const response = await fetch(controlUrl, { method: 'POST', headers, body: JSON.stringify({ groupId: s.settings.groupId }) });
+    const data = await response.json();
+    if (!response.ok || !data.ok) return res.status(502).json({ error: data.error || 'تعذر قراءة أعضاء الجروب' });
+    const allowed = new Set([...s.captains.filter(c => c.balance > 0), ...s.accountants].map(c => String(c.phone).replace(/\D/g, '')));
+    // رقم واتساب البوت نفسه ما بينزال
+    const botNumber = String(baileys.getOwnerNumber() || '').replace(/\D/g, '');
+    if (botNumber) allowed.add(botNumber);
+    const removed = [], failed = [];
+    for (const p of (data.participants || [])) {
+      const phone = String(p).replace(/\D/g, '');
+      if (allowed.has(phone)) continue;
+    const result = await removeFromGroup(phone, s.settings.groupId);
+      if (result.performed) removed.push(phone);
+      else failed.push({ phone, reason: result.reason || 'تعذرت الإزالة' });
+    }
+    addEntry(s, { type: 'system', phone: 'admin', amount: 0, note: `تنظيف الجروب: تمت إزالة ${removed.length} رقم غير مسجل/بدون رصيد${failed.length ? ` — فشل: ${failed.map(f => f.phone).join(', ')}` : ''}` });
+    save(s);
+    res.json({ ok: true, removed, failed, total: (data.participants || []).length });
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 // ============ صفحة المحاسب ============
 app.get('/api/accountant/me', (req, res) => {
   const s = load();
@@ -659,12 +702,10 @@ app.post('/webhook/group', async (req, res) => {
     const rate = money(category === 'orders' ? (s.settings.orderCommission ?? 1) : (s.settings.passengerCommission ?? 0.5));
     requester.stats = requester.stats || emptyStats();
     if (requester.balance < rate) {
-      // رصيده ما بيكفي → ينحذف من الجروب فورًا
-      const result = await removeFromGroup(from, groupId);
-      requester.removedFromGroup = true;
-      addEntry(s, { type: 'system', phone: from, amount: 0, note: `أزيل من الجروب: رصيده لا يكفي عمولة ${category === 'orders' ? 'أوردر' : 'راكب'} (${rate})${result.performed ? '' : ` (${result.reason || ''})`}` });
+      // رصيده ما بيكفي → ما بينزال من الجروب، بس ما بيواخد عمولة (اللايك بينسي)
+      addEntry(s, { type: 'system', phone: from, amount: 0, note: `لايك مرفوض: رصيده لا يكفي عمولة ${category === 'orders' ? 'أوردر' : 'راكب'} (${rate}) — اشحن رصيد` });
       save(s);
-      return res.json({ ok: true, status: 'removed-insufficient' });
+      return res.json({ ok: true, status: 'insufficient-ignored' });
     }
     requester.balance = money(requester.balance - rate);
     requester.stats[category] = (requester.stats[category] || 0) + 1;
@@ -693,13 +734,12 @@ app.post('/webhook/group', async (req, res) => {
       addEntry(s, { type: 'system', phone: 'admin', amount: 0, note: `تم التعرف على جروب جديد تلقائيًا من رسالة: ${event.groupId}` });
     }
     const c = findCaptain(s, from);
-    // ممنوع يكتب بالجروب لو محفظته صفر → يُزال فورًا (بياناته محفوظة)
-    if (c && c.balance <= 0 && !c.removedFromGroup) {
-      c.removedFromGroup = true;
-      const result = await removeFromGroup(from, groupId);
-      addEntry(s, { type: 'system', phone: from, amount: 0, note: `أزيل من الجروب: رصيده صفر وحاول الكتابة${result.performed ? '' : ` (${result.reason || ''})`}` });
+    // ممنوع يكتب بالجروب لو محفظته صفر → نحذف رسالته فورًا (بدل إزالته من الجروب)
+    if (c && c.balance <= 0) {
+      const result = await deleteGroupMessage(event.id, event.groupId || groupId);
+      addEntry(s, { type: 'system', phone: from, amount: 0, note: `حُذفت رسالة كابتن رصيده صفر من الجروب${result.performed ? '' : ` (${result.reason || ''})`}` });
       save(s);
-      return res.json({ ok: true, status: 'removed-zero-balance' });
+      return res.json({ ok: true, status: 'message-deleted-zero-balance' });
     }
     if (event.id && !s.messages.some(m => m.id === event.id)) {
       s.messages.push({ id: event.id, from, text: String(event.text || ''), createdAt: new Date().toISOString() });
@@ -738,7 +778,7 @@ app.get('/whatsapp-link', (_, res) => res.sendFile(path.join(__dirname, 'public'
 
 app.get('/api/health', (_, res) => res.json({ ok: true, app: 'شهم' }));
 app.get('/control-room', (_, res) => {
-  const page = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  const page = fs.readFileSync(path.join(__dirname, 'public', 'admin.html'), 'utf8');
   const enhancement = `<script>
   (() => {
     const panel = document.getElementById('panel');

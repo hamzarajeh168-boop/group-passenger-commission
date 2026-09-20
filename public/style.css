@@ -10,3 +10,22 @@ h3{color:#ffd66b;margin:14px 0 8px;font-size:15px}
 .ledger{display:flex;justify-content:space-between;align-items:center;gap:10px;border-bottom:1px solid var(--line);padding:10px 0;flex-wrap:wrap}
 .ledger small{display:block;color:var(--muted)}
 .ok{color:var(--ok)}.bad{color:var(--bad)}
+
+/* ═══ شهم — تحديث الثيم ═══ */
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
+body{font-family:'Cairo',Tahoma,Arial,sans-serif;background:radial-gradient(ellipse at 20% 0%,#17355b 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,#1a2f4d 0%,transparent 50%),#060d18;min-height:100vh}
+header b{font-size:36px;font-weight:900;background:linear-gradient(135deg,#ffd766,#f4b942,#d99a1f);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:1px}
+article{background:linear-gradient(145deg,#14243a,#0d1930);border-radius:18px;padding:22px;transition:border-color .2s}
+article:hover{border-color:#3a567e}
+article h2{color:#f4b942}
+.hero{border-radius:22px;box-shadow:0 18px 50px #0006,inset 0 1px 0 #ffffff0f}
+.hero h1{color:#f4b942;font-weight:900}
+#car{filter:drop-shadow(0 6px 14px #f4b94259)}
+input,select{border-radius:10px;padding:12px 14px;font-family:inherit}
+input:focus,select:focus{outline:none;border-color:#f4b942;box-shadow:0 0 0 3px #f4b9421f}
+button{border-radius:10px;padding:12px 20px;font-family:inherit;color:#1a1200;transition:transform .15s,box-shadow .15s;box-shadow:0 4px 14px #f4b94233}
+button:hover{transform:translateY(-2px);box-shadow:0 8px 20px #f4b9424d}
+.ok,.bad{font-weight:700}
+.captain-card{border-radius:14px;background:#0b1728}
+.ledger{padding:12px 4px}
+@media (max-width:700px){.grid{grid-template-columns:1fr}header b{font-size:28px}.hero h1{font-size:26px}}

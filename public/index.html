@@ -1,31 +1,71 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>شهم - غرفة الإدارة</title><link rel="stylesheet" href="/style.css"></head>
-<body><main class="shell">
-<header><div><b>شهم</b><span>غرفة الإدارة العامة</span></div><nav><a href="/accountant">المحاسب</a><a href="/captain">الكابتن</a></nav></header>
-<section class="hero"><div class="road"></div><div id="car">🚕</div><h1>غرفة الإدارة</h1><p>إدارة المحاسبين والكباتن والعمولات وربط الواتساب</p></section>
 
-<section id="loginCard" class="grid">
- <article><h2>دخول الإدارة</h2><label>كلمة سر الإدارة<input id="key" type="password" value="shahm-2026"></label><button id="login">دخول</button><p id="loginMsg"></p></article>
-</section>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>شهم — صفحة الكابتن</title>
+    <link rel="stylesheet" href="/style.css?v=2">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+</head>
 
-<section class="grid" id="panel" hidden>
- <article><h2>ربط WhatsApp والجروب</h2><label>رقم WhatsApp<small class="hint">سجل رقمك بدون صفر</small><input id="wa" inputmode="tel"></label><label>رابط الجروب (أو معرّف الجروب)<input id="group" placeholder="https://chat.whatsapp.com/XXXX أو xxx@g.us"></label><div class="row"><label>عمولة الراكب<input id="cPass" type="number" step=".01"></label><label>عمولة الأوردر<input id="cOrder" type="number" step=".01"></label></div><p class="hint">العدد × قيمة العمولة = المبلغ المخصوم من المستهلك ويعطى للمنتج المرتبط به</p><p class="hint">الصق رابط دعوة الجروب وسيتعرّف النظام تلقائيًا عليه ويحفظه بشكل كامل — حتى لو تغيّر الرابط لاحقًا المعرّف المحفوظ يظل صالحًا</p><button id="saveSettings">حفظ الربط</button> <button id="verifyGroup">فحص / إصلاح الجروب</button><p id="setMsg"></p></article>
+<body>
+    <main class="shell">
+        <header>
+            <div><b>شهم</b><span>صفحة الكابتن</span></div>
+        </header>
+        <section class="hero">
+            <div class="road"></div>
+            <div id="car">🚕</div>
+             <h1>بطاقتي</h1>
+            <p>رصيدك وعمولاتك في أي وقت — إذا رصيدك صفر، رسائلك بالجروب تنحذف تلقائيًا حتى تشحن</p>
+        </section>
 
- <article><h2>العمولات</h2><div class="stats"><span>🔴 عمولات الاستهلاك <b id="cConsumption">0</b></span><span>🟢 عمولات الإنتاج <b id="cProduction">0</b></span></div><div class="stats"><span>🚶 عدد الركاب <b id="tPassengers">0</b></span><span>📦 عدد الأوردرات <b id="tOrders">0</b></span><span>⭐ عمولات خاصة <b id="tSpecial">0</b></span></div></article>
+        <section class="grid" id="loginCard">
+            <article>
+                <h2>دخول الكابتن</h2>
+                <p class="hint">الدخول برقم الهاتف وكلمة السر (تُنشأ من الإدارة فقط)</p><label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر</small><input
+                        id="phone" inputmode="tel"></label><label>كلمة السر<input id="password" type="password"></label><button
+                    id="login">دخول</button>
+                <p id="loginMsg"></p>
+                <hr style="margin:14px 0;border:none;border-top:1px solid #eee">
+                <p class="hint">ما عندك حساب؟ سجّل وستُراجع إدارة النظام طلبك قبل التفعيل</p>
+                <button id="showSignup" type="button">إنشاء حساب جديد</button>
+            </article>
+            <article id="signupCard" hidden>
+                <h2>إنشاء حساب كابتن</h2>
+                <p class="hint">سيُنشأ طلب حساب جديد لكن <b>لن تستطيع الدخول إلا بعد موافقة الإدارة</b></p>
+                <label>الاسم<input id="suName"></label>
+                <label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر — يُضاف 962 تلقائيًا</small><input id="suPhone" inputmode="tel"></label>
+                <label>الإيميل (اختياري)<input id="suEmail" type="email"></label>
+                <label>كلمة السر<input id="suPass" type="password"></label>
+                <button id="signup">إرسال الطلب للإدارة</button>
+                <button id="backLogin" type="button" style="background:#888">رجوع للدخول</button>
+                <p id="signupMsg"></p>
+            </article>
+        </section>
 
- <article><h2>إنشاء حساب محاسب</h2><label>الاسم<input id="accName"></label><label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر</small><input id="accPhone" inputmode="tel"></label><label>الإيميل<input id="accEmail"></label><label>كلمة السر<input id="accPass"></label><button id="createAcc">إنشاء</button><p id="accMsg"></p></article>
+        <section class="grid" id="panel" hidden>
+            <article class="wide">
+                <div class="card-head"><span>
+                        <h2 id="capName"></h2><small id="capIdentity"></small>
+                    </span><button id="logout">تسجيل خروج</button></div>
+                <div class="captain-card">
+                    <div class="card-head"><span><b>الرصيد الحالي</b><small id="capStatus"></small></span><strong
+                            id="balance"></strong></div>
+                    <div class="stats"><span>🚶 راكب <b id="passengers"></b></span><span>📦 أوردر <b
+                                id="orders"></b></span><span>🤝 المرتبط <b id="linked"></b></span></div>
+                    <p class="hint" id="zeroWarn" hidden>⚠️ رصيدك صفر — رسائلك بالجروب راح تنحذف تلقائيًا. اشحن بحد أدنى 10 دنانير لتفعيل حسابك.</p>
+                </div>
+            </article>
+            <article class="wide">
+                <h2>سجل الجرد</h2>
+                <div id="ledger"></div>
+            </article>
+        </section>
+    </main>
+    <script src="/index.js?v=2"></script>
+</body>
 
- <article><h2>إنشاء حساب كابتن</h2><label>الاسم<input id="capName"></label><label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر</small><input id="capPhone" inputmode="tel"></label><label>الإيميل<input id="capEmail"></label><label>كلمة السر<input id="capPass"></label><button id="createCap">إنشاء</button><p id="capMsg"></p></article>
-
- <article><h2>شحن رصيد</h2><p class="hint">أقل قيمة شحن <b>10 دنانير</b></p><div class="row"><input id="topPhone" inputmode="tel" placeholder="رقم الهاتف (بدون صفر)"><input id="topAmount" type="number" step=".01" placeholder="القيمة"></div><button id="topup">شحن الرصيد</button><p id="topMsg"></p></article>
-
- <article><h2>سحب / إرسال رصيد</h2><p class="hint">بالرقم فقط: اكتب القيمة ورقم صاحبها</p><div class="row"><input id="wdPhone" inputmode="tel" placeholder="رقم الهاتف (بدون صفر)"><input id="wdAmount" type="number" step=".01" placeholder="القيمة"></div><button id="withdraw">سحب الرصيد</button><p id="wdMsg"></p></article>
-
- <article><h2>ربط مستهلك بمنتج</h2><p class="hint">المستهلك يُخصم منه عمولة الراكب وتُعطى تلقائيًا للمنتج المرتبط به</p><div class="row"><input id="pairConsumer" inputmode="tel" placeholder="رقم المستهلك (بدون صفر)"><input id="pairProduct" inputmode="tel" placeholder="رقم المنتج (بدون صفر)"></div><button id="addPair">ربط</button><p id="pairMsg"></p></article>
-
- <article class="wide"><h2>كل الحسابات المسجلة</h2><input id="search" placeholder="بحث برقم الهاتف (بدون صفر)"><div id="accounts"></div></article>
- <article class="wide" id="signupRequestsCard" hidden><h2>طلبات إنشاء حساب معلقة</h2><p class="hint">الحساب لا يُنشأ إلا بعد موافقتك</p><div id="signupRequests"></div></article>
- <article class="wide"><h2>سجل العمليات</h2><button id="refreshLedger">تحديث السجل</button><div id="ledger"></div></article>
-</section>
-</main><script src="/app.js"></script></body></html>
+</html>

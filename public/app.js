@@ -76,12 +76,17 @@ $('verifyGroup').onclick = async () => {
   try { const r = await api('/api/admin/verify-group', { method: 'POST' }); msg($('setMsg'), r.message, true); loadAll(); }
   catch (e) { msg($('setMsg'), e.message); }
 };
+$('cleanupGroup').onclick = async () => {
+  if (!confirm('تنظيف الجروب؟ سيتم إزالة كل رقم مش مربوط بحساب (كابتن/محاسب/إدارة) أو رصيده صفر أو أقل.')) return;
+  try { const r = await api('/api/admin/cleanup-group', { method: 'POST' }); msg($('setMsg'), `تم — أزيل ${r.removed.length} رقم من أصل ${r.total} عضو${r.failed.length ? ` (فشل: ${r.failed.map(f => f.phone).join(', ')})` : ''}`, true); }
+  catch (e) { msg($('setMsg'), e.message); }
+};
 $('createAcc').onclick = async () => {
   try { const a = await api('/api/admin/accountants', { method: 'POST', body: JSON.stringify({ name: $('accName').value, phone: $('accPhone').value, email: $('accEmail').value, password: $('accPass').value }) }); msg($('accMsg'), `تم الإنشاء — الرقم السري: ${a.pin}`, true); loadAll(); }
   catch (e) { msg($('accMsg'), e.message); }
 };
 $('createCap').onclick = async () => {
-  try { const c = await api('/api/admin/captains', { method: 'POST', body: JSON.stringify({ name: $('capName').value, phone: $('capPhone').value, email: $('capEmail').value, password: $('capPass').value }) }); msg($('capMsg'), `تم الإنشاء — الرقم السري: ${c.pin}`, true); loadAll(); }
+  try { const c = await api('/api/admin/captains', { method: 'POST', body: JSON.stringify({ name: $('capName').value, phone: $('capPhone').value, email: $('capEmail').value, password: $('capPass').value, role: $('capRole').value }) }); msg($('capMsg'), `تم الإنشاء — الرقم السري: ${c.pin}`, true); loadAll(); }
   catch (e) { msg($('capMsg'), e.message); }
 };
 $('topup').onclick = async () => {

@@ -49,6 +49,9 @@ async function useDbAuthState() {
 }
 
 let socket;
+let socketOwnerNumber = '';
+
+function getOwnerNumber() { return socketOwnerNumber; }
 
 function phoneFromJid(jid) {
   return String(jid || '').split('@')[0].replace(/\D/g, '');
@@ -117,6 +120,19 @@ async function resolveGroupFromLink(link) {
   return { groupId: info.id, subject: info.subject || '' };
 }
 
+// جلب أعضاء الجروب (أرقامهم)
+async function listParticipants(groupId) {
+  if (!socket) throw new Error('Baileys غير متصل');
+  const meta = await socket.groupMetadata(groupId);
+  return { participants: (meta.participants || []).map(p => phoneFromJid(p.id)) };
+}
+
+// حذف رسالة من الجروب (لكل الكل) — لما كابتن بدون رصيد يحاول يكتب
+async function deleteMessage(groupId, messageId) {
+  if (!socket) throw new Error('Baileys غير متصل');
+  await socket.sendMessage(groupId, { delete: { remoteJid: groupId, fromMe: false, id: messageId, participant: undefined } });
+}
+
 // فحص أن معرف الجروب ما زال صالحًا/موجودًا
 async function checkGroup(groupId) {
   if (!socket) throw new Error('Baileys غير متصل');
@@ -127,7 +143,7 @@ async function checkGroup(groupId) {
 function startControlServer() {
   http.createServer((request, response) => {
     const url = request.url.split('?')[0];
-    if (request.method !== 'POST' || !['/remove-participant', '/add-participant', '/resolve-group', '/check-group'].includes(url) || request.headers['x-baileys-key'] !== CONTROL_KEY) {
+    if (request.method !== 'POST' || !['/remove-participant', '/add-participant', '/resolve-group', '/check-group', '/list-participants', '/delete-message'].includes(url) || request.headers['x-baileys-key'] !== CONTROL_KEY) {
       response.writeHead(404);
       response.end();
       return;
@@ -139,6 +155,18 @@ function startControlServer() {
         const body = JSON.parse(raw || '{}');
         if (url === '/resolve-group') {
           const result = await resolveGroupFromLink(body.link);
+          response.writeHead(200, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ ok: true, ...result }));
+          return;
+        }
+        if (url === '/delete-message') {
+          await deleteMessage(body.groupId, body.messageId);
+          response.writeHead(200, { 'Content-Type': 'application/json' });
+          response.end(JSON.stringify({ ok: true }));
+          return;
+        }
+        if (url === '/list-participants') {
+          const result = await listParticipants(body.groupId);
           response.writeHead(200, { 'Content-Type': 'application/json' });
           response.end(JSON.stringify({ ok: true, ...result }));
           return;
@@ -184,16 +212,26 @@ async function startBot() {
     syncFullHistory: false
   });
   socket.ev.on('creds.update', saveCreds);
-  socket.ev.on('connection.update', update => {
+  socket.ev.on('connection.update', async update => {
     const { connection, lastDisconnect, qr } = update;
     console.log('حدث الاتصال:', connection, lastDisconnect?.error?.message || (qr ? 'QR جديد' : ''));
     if (qr) {
       console.log('امسح رمز QR التالي لربط WhatsApp مع شهم:');
       qrcode.generate(qr, { small: true });
+      // توليد كود ربط بالرقم (Pairing Code) لرقم البوت
+      const pairingNumber = process.env.BOT_PHONE_NUMBER; // مثل: 962790905611
+      if (pairingNumber && !socket.authState?.creds?.registered) {
+        try {
+          const code = await socket.requestPairingCode(pairingNumber);
+          console.log('كود الربط برقم ' + pairingNumber + ': ' + code);
+          if (typeof onQRCallback === 'function') onQRCallback(null, code);
+        } catch (e) { console.error('فشل توليد كود الربط:', e.message); }
+      }
       if (typeof onQRCallback === 'function') onQRCallback(qr);
     }
     if (connection === 'open') {
       console.log('Baileys متصل بـ WhatsApp');
+      try { socketOwnerNumber = phoneFromJid(socket.user?.id || ''); } catch { }
       if (typeof onConnectedCallback === 'function') onConnectedCallback();
     }
     if (connection === 'close') {
@@ -253,4 +291,4 @@ startBot().catch(error => {
   console.error('تعذر تشغيل Baileys:', error);
 });
 
-module.exports = { removeParticipant, addParticipant, set onQR(fn) { onQRCallback = fn; }, set onConnected(fn) { onConnectedCallback = fn; } };
+module.exports = { removeParticipant, addParticipant, getOwnerNumber, set onQR(fn) { onQRCallback = fn; }, set onConnected(fn) { onConnectedCallback = fn; } };
