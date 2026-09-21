@@ -221,14 +221,15 @@ async function addToGroup(phone, groupId) {
 }
 
 // حذف رسالة من الجروب (بدل إزالة الكابتن من الجروب)
-async function deleteGroupMessage(messageId, groupId) {
+async function deleteGroupMessage(messageId, groupId, participant) {
   if (!groupId) return { performed: false, reason: 'لم يتم ضبط معرف الجروب بعد' };
   if (!messageId) return { performed: false, reason: 'لا يوجد معرف رسالة' };
   if (baileys) {
     const controlUrl = `http://127.0.0.1:${Number(process.env.BAILEYS_CONTROL_PORT || 4101)}/delete-message`;
     try {
-      const response = await fetch(controlUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-baileys-key': process.env.BAILEYS_CONTROL_KEY || 'shahm-local' }, body: JSON.stringify({ groupId, messageId }) });
-      if (!response.ok) return { performed: false, reason: `Baileys أرجع HTTP ${response.status}` };
+      const response = await fetch(controlUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-baileys-key': process.env.BAILEYS_CONTROL_KEY || 'shahm-local' }, body: JSON.stringify({ groupId, messageId, participant }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) return { performed: false, reason: data.error || `Baileys أرجع HTTP ${response.status}` };
       return { performed: true };
     } catch (error) { return { performed: false, reason: `Baileys غير متصل: ${error.message}` }; }
   }
@@ -736,7 +737,7 @@ app.post('/webhook/group', async (req, res) => {
     const c = findCaptain(s, from);
     // ممنوع يكتب بالجروب لو محفظته صفر → نحذف رسالته فورًا (بدل إزالته من الجروب)
     if (c && c.balance <= 0) {
-      const result = await deleteGroupMessage(event.id, event.groupId || groupId);
+      const result = await deleteGroupMessage(event.id, event.groupId || groupId, from);
       addEntry(s, { type: 'system', phone: from, amount: 0, note: `حُذفت رسالة كابتن رصيده صفر من الجروب${result.performed ? '' : ` (${result.reason || ''})`}` });
       save(s);
       return res.json({ ok: true, status: 'message-deleted-zero-balance' });
