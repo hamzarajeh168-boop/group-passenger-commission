@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const { Pool } = require('pg');
 const app = express();
 const PORT = process.env.PORT || 4000;
-const ADMIN_KEY = process.env.ADMIN_KEY || 'shahm-2026';
+const ADMIN_KEY = process.env.ADMIN_KEY || 'sh123@@00';
 const FILE = path.join(__dirname, 'data', 'state.json');
 app.use(express.json({ limit: '2mb' }));
 // واجهة المحاسب تُقدَّم من الخادم كي تبقى متوافقة مع بيئات النشر التي تجعل public للقراءة فقط.
@@ -373,7 +373,8 @@ app.post('/api/admin/remove-from-group', async (req, res) => {
   const acc = findAccountant(s, phone);
   const c = findCaptain(s, phone);
   if (!acc && !c) return res.status(404).json({ error: 'رقم غير موجود في النظام' });
-  const target = acc || c;
+  if (acc) return res.status(403).json({ error: 'ممنوع إزالة المحاسب من الجروب — حسابات الإدارة والمحاسبين محمية' });
+  const target = c;
   target.removedFromGroup = true;
   const result = await removeFromGroup(phone, s.settings.groupId);
   addEntry(s, { type: 'system', phone, amount: 0, note: `إزالة من جروب الواتساب${result.performed ? '' : ` (${result.reason || ''})`}` });
@@ -513,10 +514,13 @@ app.post('/api/admin/cleanup-group', async (req, res) => {
     const response = await fetch(controlUrl, { method: 'POST', headers, body: JSON.stringify({ groupId: s.settings.groupId }) });
     const data = await response.json();
     if (!response.ok || !data.ok) return res.status(502).json({ error: data.error || 'تعذر قراءة أعضاء الجروب' });
+    // المحاسبون ورقم واتساب الإدارة محميون دائمًا — لا تُزال إلا بأمر الإدارة المباشر
+    const protectedNumbers = new Set([...s.accountants.map(a => String(a.phone).replace(/\D/g, '')), normPhone(s.settings.whatsappNumber)].filter(Boolean));
     const allowed = new Set([...s.captains.filter(c => c.balance > 0), ...s.accountants].map(c => String(c.phone).replace(/\D/g, '')));
     // رقم واتساب البوت نفسه ما بينزال
     const botNumber = String(baileys.getOwnerNumber() || '').replace(/\D/g, '');
     if (botNumber) allowed.add(botNumber);
+    protectedNumbers.forEach(n => allowed.add(n));
     const removed = [], failed = [];
     for (const p of (data.participants || [])) {
       const phone = String(p).replace(/\D/g, '');
@@ -739,8 +743,11 @@ app.post('/webhook/group', async (req, res) => {
       addEntry(s, { type: 'system', phone: 'admin', amount: 0, note: `تم التعرف على جروب جديد تلقائيًا من رسالة: ${event.groupId}` });
     }
     const c = findCaptain(s, from);
-    // ممنوع يكتب بالجروب لو محفظته صفر → نحذف رسالته فورًا (بدل إزالته من الجروب)
-    if (c && c.balance <= 0) {
+    const isAccountant = s.accountants.some(a => a.phone === from);
+    // الحماية: أدمن الجروب أو المحاسب — رسالتهما لا تُحذف أبدًا، وإزالتهما فقط بأمر الإدارة
+    const isProtected = isAccountant || from === normPhone(s.settings.whatsappNumber);
+    // حذف الرسائل فقط لكباتن مسجلين رصيدهم صفر — الأدمن/المحاسب/غير المسجل معفين
+    if (c && !isProtected && c.balance <= 0) {
       const result = await deleteGroupMessage(event.id, event.groupId || groupId, from);
       addEntry(s, { type: 'system', phone: from, amount: 0, note: `حُذفت رسالة كابتن رصيده صفر من الجروب${result.performed ? '' : ` (${result.reason || ''})`}` });
       save(s);
