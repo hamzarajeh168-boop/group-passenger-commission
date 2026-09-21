@@ -128,9 +128,10 @@ async function listParticipants(groupId) {
 }
 
 // حذف رسالة من الجروب (لكل الكل) — لما كابتن بدون رصيد يحاول يكتب
-async function deleteMessage(groupId, messageId) {
+async function deleteMessage(groupId, messageId, participant) {
   if (!socket) throw new Error('Baileys غير متصل');
-  await socket.sendMessage(groupId, { delete: { remoteJid: groupId, fromMe: false, id: messageId, participant: undefined } });
+  // participant مطلوب لحذف رسالة كتبها عضو آخر — بدونه يرفض واتساب الحذف
+  await socket.sendMessage(groupId, { delete: { remoteJid: groupId, fromMe: false, id: messageId, participant: participant ? `${phoneFromJid(participant)}@s.whatsapp.net` : undefined } });
 }
 
 // فحص أن معرف الجروب ما زال صالحًا/موجودًا
@@ -160,7 +161,7 @@ function startControlServer() {
           return;
         }
         if (url === '/delete-message') {
-          await deleteMessage(body.groupId, body.messageId);
+          await deleteMessage(body.groupId, body.messageId, body.participant);
           response.writeHead(200, { 'Content-Type': 'application/json' });
           response.end(JSON.stringify({ ok: true }));
           return;
