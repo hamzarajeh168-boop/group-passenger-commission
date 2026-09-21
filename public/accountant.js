@@ -51,6 +51,14 @@ window.doAdd = async phone => {
   try { const r = await api('/api/accountant/add-to-group', { method: 'POST', body: JSON.stringify({ phone }) }); alert(r.ok ? 'تمت الإضافة للجروب' : `تعذرت الإضافة: ${r.reason}`); loadMe(); }
   catch (e) { alert(e.message); }
 };
+// إظهار رصيد الكابتن عند كتابة رقمه (للمحاسب)
+window.checkBalance = async phone => {
+  const el = $('sendBalanceInfo');
+  const p = String(phone || '').replace(/\D/g, '');
+  if (p.length < 9) { el.hidden = true; return; }
+  try { const r = await api('/api/accountant/search?phone=' + encodeURIComponent(p)); el.textContent = `💰 رصيد ${r.name} (${r.role}): ${money(r.balance)}`; el.hidden = false; }
+  catch { el.hidden = true; }
+};
 window.doRemove = async phone => {
   if (!confirm(`إزالة ${phone} من جروب الواتساب؟ بياناته ستبقى محفوظة`)) return;
   try { const r = await api('/api/accountant/remove-from-group', { method: 'POST', body: JSON.stringify({ phone }) }); alert(r.ok ? 'تمت الإزالة من الجروب' : `تعذرت الإزالة: ${r.reason}`); loadMe(); }
