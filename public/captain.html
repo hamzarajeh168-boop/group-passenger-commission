@@ -1,73 +1,149 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>شهم - صفحة الكابتن</title>
-    <link rel="stylesheet" href="/style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>شهم — صفحة الكابتن</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+body{font-family:'Cairo',Tahoma,sans-serif;background:#0a0a0a;color:#fff;min-height:100vh}
+.wrap{max-width:440px;margin:auto;padding:24px 18px}
+.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:28px}
+.logo{display:flex;align-items:center;gap:10px;font-weight:900;font-size:22px}
+.logo .ic{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#ffd733,#f4b942);display:grid;place-items:center;font-size:20px}
+.logo small{display:block;font-size:11px;color:#888;font-weight:400}
+.lang{color:#f4b942;font-weight:700;font-size:13px;border:1px solid #333;border-radius:8px;padding:6px 12px}
+.hero{text-align:center;margin-bottom:26px}
+.hero .big{font-size:40px}
+.hero h1{font-size:24px;font-weight:900;margin:10px 0 6px}
+.hero p{color:#999;font-size:13px;line-height:1.7}
+.card{background:#141414;border:1px solid #262626;border-radius:18px;padding:22px;margin-bottom:16px}
+.card h2{font-size:17px;font-weight:900;margin-bottom:6px}
+.card .sub{color:#888;font-size:12px;margin-bottom:18px}
+.phone-row{display:flex;gap:8px;direction:ltr}
+.cc{display:flex;align-items:center;gap:6px;background:#1f1f1f;border:1px solid #333;border-radius:12px;padding:0 14px;color:#fff;font-size:14px;white-space:nowrap}
+.cc .flag{font-size:18px}
+.phone-row input{flex:1;direction:ltr;text-align:left}
+input{width:100%;background:#1f1f1f;border:1px solid #333;border-radius:12px;color:#fff;padding:14px;font-size:15px;font-family:inherit;outline:none}
+input:focus{border-color:#f4b942}
+label{display:block;font-size:13px;color:#aaa;margin:14px 0 7px;font-weight:600}
+.btn{width:100%;background:linear-gradient(135deg,#ffd733,#f4b942);color:#111;border:0;border-radius:12px;padding:15px;font-size:16px;font-weight:900;cursor:pointer;font-family:inherit;margin-top:18px}
+.btn:active{transform:scale(.98)}
+.btn.ghost{background:#1f1f1f;color:#f4b942;border:1px solid #333}
+.msg{font-size:13px;margin-top:10px;min-height:18px}
+.msg.ok{color:#50d890}.msg.bad{color:#ff7182}
+.yellow{background:linear-gradient(150deg,#ffd733,#f4b942);color:#111;border:0;border-radius:20px;padding:22px;position:relative;overflow:hidden}
+.yellow .who{display:flex;justify-content:space-between;align-items:flex-start}
+.yellow .who b{font-size:18px;font-weight:900}
+.yellow .who small{display:block;font-size:12px;opacity:.75;margin-top:3px}
+.yellow .avatar{width:46px;height:46px;border-radius:50%;background:#111;color:#f4b942;display:grid;place-items:center;font-size:20px;font-weight:900}
+.yellow .bal{font-size:36px;font-weight:900;margin:16px 0 4px}
+.yellow .bal small{font-size:13px;font-weight:600}
+.badge{display:inline-block;background:#111;color:#ffd733;border-radius:20px;padding:5px 14px;font-size:12px;font-weight:900;margin-top:8px}
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}
+.mini div{background:#1113;color:#111;border-radius:10px;padding:9px;text-align:center;font-size:11px;font-weight:700}
+.mini b{display:block;font-size:15px;font-weight:900}
+.led{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid #222}
+.led:last-child{border:0}
+.led .t{font-size:14px;font-weight:700}
+.led .d{font-size:11px;color:#777;margin-top:3px}
+.led .amt{font-weight:900;font-size:15px}
+.led .amt.ok{color:#50d890}.led .amt.bad{color:#ff7182}
+.summary{background:#1f1f1f;border-radius:10px;padding:10px 14px;font-size:12px;color:#aaa;margin-bottom:8px}
+.warn{background:#3a1e1e;border:1px solid #6b2b2b;color:#ff9aa5;border-radius:12px;padding:12px;font-size:13px;margin-top:14px}
+.tabs{display:flex;gap:8px;margin-bottom:18px}
+.tabs button{flex:1;background:#1f1f1f;color:#888;border:0;border-radius:10px;padding:11px;font-family:inherit;font-weight:700;font-size:14px;cursor:pointer}
+.tabs button.on{background:linear-gradient(135deg,#ffd733,#f4b942);color:#111}
+.hidden{display:none!important}
+</style>
 </head>
-
 <body>
-    <main class="shell">
-        <header>
-            <div><b>شهم</b><span>صفحة الكابتن</span></div>
-        </header>
-        <section class="hero">
-            <div class="road"></div>
-            <div id="car">🚕</div>
-             <h1>بطاقتي</h1>
-            <p>رصيدك وعمولاتك في أي وقت — إذا رصيدك صفر، رسائلك بالجروب تنحذف تلقائيًا حتى تشحن</p>
-        </section>
+<main class="wrap">
 
-        <section class="grid" id="loginCard">
-            <article>
-                <h2>دخول الكابتن</h2>
-                <p class="hint">الدخول برقم الهاتف وكلمة السر (تُنشأ من الإدارة فقط)</p><label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر</small><input
-                        id="phone" inputmode="tel"></label><label>كلمة السر<input id="password" type="password"></label><button
-                    id="login">دخول</button>
-                <p id="loginMsg"></p>
-                <hr style="margin:14px 0;border:none;border-top:1px solid #eee">
-                <p class="hint">ما عندك حساب؟ سجّل وستُراجع إدارة النظام طلبك قبل التفعيل</p>
-                <button id="showSignup" type="button">إنشاء حساب جديد</button>
-            </article>
-            <article id="signupCard" hidden>
-                <h2>إنشاء حساب كابتن</h2>
-                <p class="hint">سيُنشأ طلب حساب جديد لكن <b>لن تستطيع الدخول إلا بعد موافقة الإدارة</b></p>
-                <label>الاسم<input id="suName"></label>
-                <label>رقم الهاتف<small class="hint">سجل رقمك بدون صفر — يُضاف 962 تلقائيًا</small><input id="suPhone" inputmode="tel"></label>
-                <label>الإيميل (اختياري)<input id="suEmail" type="email"></label>
-                <label>كلمة السر<input id="suPass" type="password"></label>
-                <button id="signup">إرسال الطلب للإدارة</button>
-                <button id="backLogin" type="button" style="background:#888">رجوع للدخول</button>
-                <p id="signupMsg"></p>
-            </article>
-        </section>
+  <!-- الهيدر -->
+ <div class="top">
+    <div class="logo"><span class="ic">🚕</span><span>شهم<small>كابتن — جروب نقل ركاب</small></span></div>
+    <span class="lang">🇯🇴 +962</span>
+ </div>
 
-        <section class="grid" id="panel" hidden>
-            <article class="wide">
-                <div class="card-head"><span>
-                        <h2 id="capName"></h2><small id="capIdentity"></small>
-                    </span><button id="logout">تسجيل خروج</button></div>
-                <div class="captain-card">
-                    <div class="card-head"><span><b>الرصيد الحالي</b><small id="capStatus"></small></span><strong
-                            id="balance"></strong></div>
-                    <div class="stats"><span>🏷️ فئتي <b id="category"></b></span><span>⬇️ إجمالي استهلاكي <b id="consumptionTotal"></b></span><span>⬆️ إجمالي إنتاجي <b id="productionTotal"></b></span></div>
-                    <div class="stats"><span>🚶 راكب <b id="passengers"></b></span><span>📦 أوردر <b
-                                id="orders"></b></span><span>🤝 المرتبط <b id="linked"></b></span></div>
-                    <p class="hint" id="zeroWarn" hidden>⚠️ رصيدك صفر — رسائلك بالجروب راح تنحذف تلقائيًا. اشحن بحد أدنى 10 دنانير لتفعيل حسابك.</p>
-                </div>
-            </article>
-            <article class="wide">
-                <h2>سجل الجرد</h2>
-                <p class="hint" id="ledgerSummary"></p>
-                <div id="ledger"></div>
-            </article>
-        </section>
-    </main>
-    <script src="/captain.js"></script>
+  <!-- ====== صفحة الدخول/التسجيل ====== -->
+ <section id="authView">
+    <div class="hero">
+      <div class="big">🚕</div>
+      <h1>أهلاً كابتن</h1>
+      <p>سجّل دخولك لترى رصيدك وسجل الجرد — إذا رصيدك صفر رسائلك بالجروب تنحذف تلقائيًا حتى تشحن</p>
+    </div>
+
+    <div class="tabs">
+      <button id="tabLogin" class="on">تسجيل دخول</button>
+      <button id="tabSignup">إنشاء حساب</button>
+    </div>
+
+    <!-- دخول -->
+    <div class="card" id="loginBox">
+      <h2>تسجيل دخول الكابتن</h2>
+      <p class="sub">الدخول برقم هاتفك وكلمة السر</p>
+      <label>رقم الهاتف</label>
+      <div class="phone-row">
+        <span class="cc"><span class="flag">🇯🇴</span> +962</span>
+        <input id="phone" inputmode="tel" placeholder="790000">
+      </div>
+      <label>كلمة السر</label>
+      <input id="password" type="password" placeholder="•">
+      <button class="btn" id="login">دخول</button>
+      <p class="msg" id="loginMsg"></p>
+    </div>
+
+    <!-- إنشاء حساب -->
+    <div class="card hidden" id="signupBox">
+      <h2>إنشاء حساب كابتن</h2>
+      <p class="sub">طلبك يروح للإدارة — ما تقدر تدخل إلا بعد موافقتهم</p>
+      <label>الاسم</label><input id="suName" placeholder="اسمك الكامل">
+      <label>رقم الهاتف</label>
+      <div class="phone-row">
+        <span class="cc"><span class="flag">🇯🇴</span> +962</span>
+        <input id="suPhone" inputmode="tel" placeholder="790000">
+      </div>
+      <label>الإيميل (اختياري)</label><input id="suEmail" type="email" placeholder="you@mail.com">
+      <label>كلمة السر</label><input id="suPass" type="password" placeholder="•">
+      <button class="btn" id="signup">إرسال الطلب للإدارة</button>
+      <p class="msg" id="signupMsg"></p>
+    </div>
+ </section>
+
+  <!-- ====== اللوحة الداخلية ====== -->
+ <section id="panelView" class="hidden">
+    <!-- البطاقة الصفراء -->
+    <div class="yellow">
+      <div class="who">
+        <div><b id="capName">—</b><small id="capIdentity">—</small></div>
+        <div class="avatar" id="capInitial">؟</div>
+      </div>
+      <div class="bal"><span id="balance">0.00</span> <small>د.أ — رصيدك</small></div>
+      <span class="badge" id="category">—</span>
+      <div class="mini">
+        <div>⬇️ استهلاكي<b id="consumptionTotal">0</b></div>
+        <div>⬆️ إنتاجي<b id="productionTotal">0</b></div>
+        <div>🤝 المرتبط<b id="linked">—</b></div>
+      </div>
+    </div>
+
+    <p class="msg" id="capStatus" style="margin:12px 2px"></p>
+    <div class="warn hidden" id="zeroWarn">⚠️ رصيدك صفر — رسائلك بالجروب راح تنحذف تلقائيًا. اشحن بحد أدنى 10 دنانير لتفعيل حسابك.</div>
+
+    <!-- سجل الجرد -->
+    <div class="card" style="margin-top:16px">
+      <h2>📋 سجل الجرد</h2>
+      <p class="sub" id="ledgerSummary">—</p>
+      <div id="ledger"><p class="sub">لا يوجد عمليات بعد</p></div>
+    </div>
+
+    <button class="btn ghost" id="logout">تسجيل خروج</button>
+ </section>
+
+</main>
+<script src="/captain.js"></script>
 </body>
-
 </html>
