@@ -102,14 +102,15 @@ $('addPair').onclick = async () => {
   catch (e) { msg($('pairMsg'), e.message); }
 };
 $('refreshLedger').onclick = renderLedger;
+$('refreshRequests').onclick = renderRequests;
 $('search').oninput = renderAccounts;
 
 // ============ طلبات إنشاء الحساب ============
 async function renderRequests() {
   try {
     const requests = await api('/api/admin/signup-requests');
-    $('signupRequestsCard').hidden = requests.length === 0;
-    $('signupRequests').innerHTML = requests.map(r => `<div class="ledger"><span><b>${esc(r.name)}</b><small>${r.phone} · ${esc(r.email || '')} · ${r.createdAt}</small></span><span class="actions"><button onclick="approveReq('${r.id}')">موافقة وإنشاء</button><button onclick="rejectReq('${r.id}')" style="background:#c0392b">رفض</button></span></div>`).join('') || '<small>لا يوجد طلبات معلقة</small>';
+    $('signupRequestsCard').hidden = false;
+    $('signupRequests').innerHTML = requests.length ? requests.map(r => `<div class="ledger"><span><b>${esc(r.name)}</b><small>${r.phone} · ${esc(r.email || '')} · ${new Date(r.createdAt).toLocaleString('ar-EG')}</small></span><span class="actions"><button onclick="approveReq('${r.id}')">موافقة وإنشاء</button><button onclick="rejectReq('${r.id}')" style="background:#c0392b">رفض</button></span></div>`).join('') : '<small>لا يوجد طلبات معلقة حاليًا — طلب أي كابتن يعمل «إنشاء حساب» سيظهر هنا مباشرة</small>';
   } catch { }
 }
 window.approveReq = async id => {
