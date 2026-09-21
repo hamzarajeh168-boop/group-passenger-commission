@@ -266,8 +266,12 @@ function issueSession(s, phone, role) { const token = crypto.randomUUID(); s.ses
 function captainView(s, c) {
   const pair = s.pairs.find(p => p.consumerPhone === c.phone || p.productPhone === c.phone) || null;
   const linkedPhone = pair ? (pair.consumerPhone === c.phone ? pair.productPhone : pair.consumerPhone) : '';
-  const entries = s.ledger.filter(e => e.phone === c.phone).slice(0, 100);
-  return { name: c.name, phone: c.phone, email: c.email, pin: c.pin, role: c.role, balance: c.balance, removedFromGroup: !!c.removedFromGroup, stats: c.stats || emptyStats(), linkedPhone, ledger: entries };
+  const entries = s.ledger.filter(e => e.phone === c.phone);
+  // الفئة تلقائية: استهلاك أكثر من إنتاج = مستهلك، والعكس = منتج — متساويين يبقى الدور الافتراضي
+  const consumptionTotal = money(entries.filter(e => e.type === 'consumption').reduce((t, e) => t + Math.abs(Number(e.amount) || 0), 0));
+  const productionTotal = money(entries.filter(e => e.type === 'production').reduce((t, e) => t + Math.abs(Number(e.amount) || 0), 0));
+  const autoCategory = consumptionTotal > productionTotal ? 'مستهلك' : (productionTotal > consumptionTotal ? 'منتج' : (c.role === 'production' ? 'منتج' : 'مستهلك'));
+  return { name: c.name, phone: c.phone, email: c.email, pin: c.pin, role: c.role, autoCategory, consumptionTotal, productionTotal, balance: c.balance, removedFromGroup: !!c.removedFromGroup, stats: c.stats || emptyStats(), linkedPhone, ledger: entries };
 }
 
 // ============ الدخول ============
