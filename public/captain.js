@@ -10,15 +10,21 @@ async function api(url, opt = {}) {
 }
 function render(c) {
   $('capName').textContent = c.name;
-  $('capIdentity').textContent = `${c.role === 'consumption' ? 'مستهلك' : 'منتج'} · ${c.phone} · ${c.email || ''} · الرقم السري: ${c.pin}`;
+  $('capIdentity').textContent = `${c.autoCategory || (c.role === 'consumption' ? 'مستهلك' : 'منتج')} · ${c.phone} · ${c.email || ''} · الرقم السري: ${c.pin}`;
   $('capStatus').textContent = c.balance <= 0 ? '⚠️ رصيد صفر — رسائلك بالجروب تنحذف تلقائيًا' : (c.removedFromGroup ? 'مزال من جروب الواتساب' : '✅ فعّال في الجروب');
   $('balance').textContent = money(c.balance);
+  $('category').textContent = c.autoCategory || '—';
+  $('consumptionTotal').textContent = money(c.consumptionTotal || 0);
+  $('productionTotal').textContent = money(c.productionTotal || 0);
   $('passengers').textContent = c.stats.passengers || 0;
   $('orders').textContent = c.stats.orders || 0;
   $('linked').textContent = c.linkedPhone || '—';
   $('zeroWarn').hidden = c.balance > 0;
+  const entries = c.ledger || [];
+  const sum = entries.reduce((t, e) => t + Number(e.amount || 0), 0);
+  $('ledgerSummary').textContent = `عدد الحركات: ${entries.length} · صافي الجرد: ${sum >= 0 ? '+' : ''}${money(sum)}`;
   const label = { consumption: 'استهلاك', production: 'إنتاج', topup: 'شحن', withdraw: 'سحب', transfer: 'تحويل', weekly: 'خصم أسبوعي', system: 'نظام' };
-  $('ledger').innerHTML = (c.ledger || []).map(e => `<div class="ledger"><span>${label[e.type] || e.type}<small>${e.note || ''} ${e.createdAt}</small></span><b class="${e.amount < 0 ? 'bad' : 'ok'}">${e.amount > 0 ? '+' : ''}${money(e.amount)}</b></div>`).join('') || '<small>لا يوجد عمليات</small>';
+  $('ledger').innerHTML = entries.map(e => `<div class="ledger"><span>${label[e.type] || e.type}<small>${e.note || ''} ${new Date(e.createdAt).toLocaleString('ar-EG')}</small></span><b class="${e.amount < 0 ? 'bad' : 'ok'}">${e.amount > 0 ? '+' : ''}${money(e.amount)}</b></div>`).join('') || '<small>لا يوجد عمليات</small>';
   $('loginCard').hidden = true;
   $('panel').hidden = false;
 }
